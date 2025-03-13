@@ -190,6 +190,15 @@ public:
                                           const CaloGeometry *geometry,
                                           float w0 = 4.7);
 
+  // return a position covariance matrix in xyz coordinates
+  static TMatrixD covariancesXYZ(const reco::BasicCluster &cluster,
+    const EcalRecHitCollection *recHits,
+    const CaloTopology *topology,
+    const CaloGeometry *geometry,
+    float w0 = 4.7);
+
+
+
   // return an array v with v[0] = covIEtaIEta, v[1] = covIEtaIPhi, v[2] = covIPhiIPhi
   //this function calculates differences in eta/phi in units of crystals not global eta/phi
   //this is gives better performance in the crack regions of the calorimeter but gives otherwise identical results to covariances function
@@ -1027,6 +1036,99 @@ std::array<float, 3> EcalClusterToolsT<noZS>::covariances(const reco::BasicClust
   std::array<float, 3> v{{covEtaEta, covEtaPhi, covPhiPhi}};
   return v;
 }
+
+
+template <bool noZS>
+TMatrixD EcalClusterToolsT<noZS>::covariancesXYZ(const reco::BasicCluster &cluster,
+                                                          const EcalRecHitCollection *recHits,
+                                                          const CaloTopology *topology,
+                                                          const CaloGeometry *geometry,
+                                                          float w0) {
+  float e_5x5 = e5x5(cluster, recHits, topology);
+  float covxx, covyy, covzz, covxy, covxz, covyz;
+  if (e_5x5 >= 0.) {
+    //double w0_ = parameterMap_.find("W0")->second;
+    const std::vector<std::pair<DetId, float>> &v_id = cluster.hitsAndFractions();
+    math::XYZVector meanPosition = meanClusterPosition(cluster, recHits, topology, geometry);
+
+    // now we can calculate the covariances
+    double numeratorxx = 0;
+    double numeratoryy = 0;
+    double numeratorzz = 0;
+    double numeratorxy = 0;
+    double numeratorxz = 0;
+    double numeratoryz = 0;
+    double denominator = 0;
+
+    DetId id = getMaximum(v_id, recHits).first;
+    CaloRectangle rectangle{-2, 2, -2, 2};
+    for (auto const &detId : rectangle(id, *topology)) {
+      float frac = getFraction(v_id, detId);
+      float energy = recHitEnergy(detId, recHits) * frac;
+
+      if (energy <= 0)
+        continue;
+
+      const CaloSubdetectorGeometry *geo = geometry->getSubdetectorGeometry(detId);
+      GlobalPoint position = geo->getGeometry(detId)->getPosition();
+
+      double dx = position.x() - meanPosition.x();
+      double dy = position.y() - meanPosition.y();
+      double dz = position.z() - meanPosition.z();
+
+      double w = 0.;
+      w = std::max(0.0f, w0 + std::log(energy / e_5x5));
+
+      denominator += w;
+      numeratorxx += w * dx * dx;
+      numeratoryy += w * dy * dy;
+      numeratorzz += w * dz * dz;
+      numeratorxy += w * dx * dy;
+      numeratorxz += w * dx * dz;
+      numeratoryz += w * dy * dz;
+    }
+
+    if (denominator != 0.0) {
+      covxx = numeratorxx / denominator;
+      covyy = numeratoryy / denominator;
+      covzz = numeratorzz / denominator;
+      covxy = numeratorxy / denominator;
+      covxz = numeratorxz / denominator;
+      covyz = numeratoryz / denominator;
+    } else {
+      covxx = 999.9;
+      covyy = 999.9;
+      covzz = 999.9;
+      covxy = 999.9;
+      covxz = 999.9;
+      covyz = 999.9;
+    }
+
+  } else {
+    // Warn the user if there was no energy in the cells and return zeroes.
+    //       std::cout << "\ClusterShapeAlgo::Calculate_Covariances:  no energy in supplied cells.\n";
+    covxx = 0;
+    covyy = 0;
+    covzz = 0;
+    covxy = 0;
+    covxz = 0;
+    covyz = 0;
+  }
+  TMatrixD cov(3, 3);
+  cov[0][0] = covxx;
+  cov[1][1] = covyy;
+  cov[2][2] = covzz;
+  cov[0][1] = covxy;
+  cov[0][2] = covxz;
+  cov[1][2] = covyz;
+  cov[1][0] = covxy;
+  cov[2][0] = covxz;
+  cov[2][1] = covyz;
+
+  return cov;
+}
+
+
 
 //for covIEtaIEta,covIEtaIPhi and covIPhiIPhi are defined but only covIEtaIEta has been actively studied
 //instead of using absolute eta/phi it counts crystals normalised so that it gives identical results to normal covariances except near the cracks where of course its better

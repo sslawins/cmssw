@@ -272,6 +272,11 @@ public:
     return ClusterTools::covariances(cluster, getEcalRecHitCollection(cluster), topology_, geometry_, w0);
   }
 
+  // return a position covariance matrix in xyz coordinates
+  TMatrixD covariancesXYZ(const reco::BasicCluster &cluster, float w0 = 4.7) const {
+    return ClusterTools::covariancesXYZ(cluster, getEcalRecHitCollection(cluster), topology_, geometry_, w0);
+  }
+
   // return an array v with v[0] = covIEtaIEta, v[1] = covIEtaIPhi, v[2] = covIPhiIPhi
   // this function calculates differences in eta/phi in units of crystals not
   // global eta/phi this is gives better performance in the crack regions of
