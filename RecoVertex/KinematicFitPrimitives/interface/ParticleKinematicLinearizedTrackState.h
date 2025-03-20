@@ -135,6 +135,9 @@ private:
  */
   void computeNeutralJacobians() const;
 
+  // Method calculating the track parameters and the Jacobians for photons
+  void computePhotonJacobians() const;
+
   GlobalPoint theLinPoint;
   RefCountedKinematicParticle part;
   TransientTrackKinematicStateBuilder builder;

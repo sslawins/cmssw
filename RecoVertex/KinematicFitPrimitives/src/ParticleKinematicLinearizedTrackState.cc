@@ -82,7 +82,11 @@ void ParticleKinematicLinearizedTrackState::computeJacobians() const {
   //  bool valid = thePredState.isValid();
   //  if (!valid) std::cout <<"Help!!!!!!!!! State is invalid\n";
   //  if (!valid) return;
-  if (std::abs(theCharge) < 1e-5) {
+  if (part.getPhoton() != nullptr) {
+    // photon
+    computePhotonJacobians();
+  }
+  else if (std::abs(theCharge) < 1e-5) {
     //neutral track
     computeNeutralJacobians();
   } else {
@@ -337,6 +341,11 @@ void ParticleKinematicLinearizedTrackState::computeNeutralJacobians() const {
   theConstantTerm = AlgebraicVector6(theExpandedParams - thePositionJacobian * expansionPoint -
                                      theMomentumJacobian * momentumAtExpansionPoint);
 }
+
+void ParticleKinematicLinearizedTrackState::computePhotonJacobians() const {
+  
+}
+
 
 reco::TransientTrack ParticleKinematicLinearizedTrackState::track() const {
   throw VertexException(" ParticleKinematicLinearizedTrackState:: no TransientTrack to return");

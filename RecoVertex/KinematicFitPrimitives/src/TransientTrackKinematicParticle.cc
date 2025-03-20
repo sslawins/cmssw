@@ -10,7 +10,8 @@ TransientTrackKinematicParticle::TransientTrackKinematicParticle(
     KinematicConstraint* lastConstraint,
     ReferenceCountingPointer<KinematicParticle> previousParticle,
     KinematicStatePropagator* pr,
-    const TransientTrack* initialTrack) {
+    const TransientTrack* initialTrack,
+    const reco::Photon* inPhoton) {
   theField = kineState.magneticField();
   if (previousParticle.get() == nullptr) {
     initState = kineState;
@@ -29,6 +30,7 @@ TransientTrackKinematicParticle::TransientTrackKinematicParticle(
     propagator = new TrackKinematicStatePropagator();
   }
   tree = nullptr;
+  photon = inPhoton;
 }
 
 TransientTrackKinematicParticle::~TransientTrackKinematicParticle() { delete propagator; }

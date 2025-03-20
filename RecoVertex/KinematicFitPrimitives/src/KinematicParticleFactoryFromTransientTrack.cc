@@ -17,7 +17,8 @@ RefCountedKinematicParticle KinematicParticleFactoryFromTransientTrack::particle
     const ParticleMass& massGuess,
     float chiSquared,
     float degreesOfFr,
-    float& m_sigma) const {
+    float& m_sigma,
+    const reco::Photon* inPhoton) const {
   // cout<<"calling the state builder"<<endl;
   KinematicState initState = builder(initialTrack, massGuess, m_sigma);
   const reco::TransientTrack* track = &initialTrack;

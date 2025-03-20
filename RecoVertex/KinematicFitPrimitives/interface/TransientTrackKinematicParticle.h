@@ -6,6 +6,8 @@
 #include "RecoVertex/KinematicFitPrimitives/interface/KinematicStatePropagator.h"
 #include "RecoVertex/KinematicFitPrimitives/interface/ParticleKinematicLinearizedTrackStateFactory.h"
 
+#include "DataFormats/EgammaCandidates/interface/Photon.h"
+
 /**
  * Class representing KinematicParticle
  * created fromTransientTrack. Uses specific
@@ -29,7 +31,8 @@ public:
                                   KinematicConstraint* lastConstraint,
                                   ReferenceCountingPointer<KinematicParticle> previousParticle,
                                   KinematicStatePropagator* pr,
-                                  const reco::TransientTrack* initialTrack = nullptr);
+                                  const reco::TransientTrack* initialTrack = nullptr,
+                                  const reco::Photon* inPhoton = nullptr);
 
   ~TransientTrackKinematicParticle() override;
 
@@ -73,9 +76,14 @@ public:
  */
   RefCountedLinearizedTrackState particleLinearizedTrackState(const GlobalPoint& point) const override;
 
+  const reco::Photon* getPhoton() {return photon;}
+
 private:
   //initial TransientTrack (if any)
   const reco::TransientTrack* inTrack;
+
+  const reco::Photon* photon;
+
 
   //propagator for kinematic states
   KinematicStatePropagator* propagator;
