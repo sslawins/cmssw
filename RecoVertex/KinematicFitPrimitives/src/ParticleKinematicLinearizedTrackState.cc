@@ -343,7 +343,37 @@ void ParticleKinematicLinearizedTrackState::computeNeutralJacobians() const {
 }
 
 void ParticleKinematicLinearizedTrackState::computePhotonJacobians() const {
-  
+  double vx = thePredState.theState().globalPosition().x();
+  double vy = thePredState.theState().globalPosition().y();
+  double vz = thePredState.theState().globalPosition().z();
+
+  double px = thePredState.theState().globalMomentum().x();
+  double py = thePredState.theState().globalMomentum().y();
+  double pz = thePredState.theState().globalMomentum().z();
+
+  double mass = part->currentState().mass();
+
+  double mx = part->getPhoton()->caloPosition().x();
+  double my = part->getPhoton()->caloPosition().y();
+  double mz = part->getPhoton()->caloPosition().z();
+  double mE = part->getPhoton()->energy();
+
+  double p = sqrt(px * px + py * py + pz * pz);
+
+  thePositionJacobian(0, 0) = py;
+  thePositionJacobian(0, 1) = -px;
+  thePositionJacobian(1, 0) = pz;
+  thePositionJacobian(1, 2) = -px;
+
+  theMomentumJacobian(0, 0) = my - vy;
+  theMomentumJacobian(0, 1) = -mx + vx;
+  theMomentumJacobian(1, 0) = mz - vz;
+  theMomentumJacobian(1, 2) = -mx + vx;
+  theMomentumJacobian(2, 0) = px/p;
+  theMomentumJacobian(2, 1) = py/p;
+  theMomentumJacobian(2, 2) = pz/p;
+  theMomentumJacobian(3, 3) = 1;
+
 }
 
 
