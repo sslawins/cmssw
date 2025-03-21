@@ -374,6 +374,29 @@ void ParticleKinematicLinearizedTrackState::computePhotonJacobians() const {
   theMomentumJacobian(2, 2) = pz/p;
   theMomentumJacobian(3, 3) = 1;
 
+
+  // The measurement function h at the expansion point
+  theExpandedParams[0] = (mx - vx) * py - (my - vy) * px;
+  theExpandedParams[1] =(mx - vx) * pz - (mz - vz) * px;
+  theExpandedParams[2] = p - mE;
+  theExpandedParams[3] = 0; // mass is a fixed hypothesis, not fitted
+  theExpandedParams[4] = 0;
+  theExpandedParams[5] = 0;
+
+
+  AlgebraicVector3 expansionPoint;
+  expansionPoint[0] = vx;
+  expansionPoint[1] = vy;
+  expansionPoint[2] = vz;
+  AlgebraicVector4 momentumAtExpansionPoint;
+  momentumAtExpansionPoint[0] = px;
+  momentumAtExpansionPoint[1] = py;
+  momentumAtExpansionPoint[2] = pz;
+  momentumAtExpansionPoint[3] = mass;
+
+  theConstantTerm = AlgebraicVector6(theExpandedParams - thePositionJacobian * expansionPoint -
+                                      theMomentumJacobian * momentumAtExpansionPoint);
+
 }
 
 
