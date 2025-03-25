@@ -10,6 +10,8 @@
 #include "DataFormats/CLHEP/interface/Migration.h"
 #include "RecoVertex/KinematicFitPrimitives/interface/Matrices.h"
 
+#include "TMatrixD.h"
+
 class ParticleKinematicLinearizedTrackState : public LinearizedTrackState<6> {
 public:
   friend class ParticleKinematicLinearizedTrackStateFactory;

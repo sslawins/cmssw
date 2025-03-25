@@ -7,6 +7,9 @@
 
 #include "DataFormats/GeometrySurface/interface/ReferenceCounted.h"
 
+#include "DataFormats/EgammaCandidates/interface/Photon.h"
+#include "TMatrixD.h"
+
 /**
  * Abstract base class for KinematicParticles
  * created out of Physics objects of different types
@@ -122,6 +125,9 @@ public:
   const MagneticField* magneticField() const { return theField; }
 
   reco::TransientTrack refittedTransientTrack() const;
+
+  virtual const reco::Photon* getPhoton() { return nullptr; }
+  virtual TMatrixD* getPhotonCov() { return nullptr; }
 
 protected:
   virtual void setTreePointer(KinematicTree* tr) const;

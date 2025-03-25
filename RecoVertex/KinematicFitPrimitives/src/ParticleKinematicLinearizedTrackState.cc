@@ -27,6 +27,12 @@ const AlgebraicVector6& ParticleKinematicLinearizedTrackState::parametersFromExp
 }
 
 AlgebraicVector6 ParticleKinematicLinearizedTrackState::predictedStateParameters() const {
+  if (part->getPhoton() != nullptr)
+  {
+    AlgebraicVector6 z;
+    return z;
+  }
+
   if (!jacobiansAvailable)
     computeJacobians();
   return thePredState.perigeeParameters().vector();
@@ -35,6 +41,42 @@ AlgebraicVector6 ParticleKinematicLinearizedTrackState::predictedStateParameters
 AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateWeight(int& error) const {
   if (!jacobiansAvailable)
     computeJacobians();
+
+  if (part->getPhoton() != nullptr)
+  {
+    double px = thePredState.theState().globalMomentum().x();
+    double py = thePredState.theState().globalMomentum().y();
+    double pz = thePredState.theState().globalMomentum().z();
+
+    AlgebraicSymMatrix44 originalError;
+    TMatrixD posCov = *(part->getPhotonCov());
+    float ECov = part->getPhoton()->superCluster()->correctedEnergyUncertainty();
+
+    for (int i = 0; i < 3; i++)
+    {
+      for (int j = 0; j < 3; j++)
+      {
+        originalError(i, j) = posCov(i, j);
+      }
+    }
+
+    originalError(3, 3) = ECov * ECov;
+
+    AlgebraicMatrix64 jacobian;
+    jacobian(0, 0) = py;
+    jacobian(0, 1) = -px;
+    jacobian(1, 0) = pz;
+    jacobian(1, 2) = -px;
+    jacobian(2, 3) = 1;
+
+    AlgebraicSymMatrix66 errorMatrix = ROOT::Math::Similarity(jacobian, originalError);
+    int i = 0;
+    AlgebraicSymMatrix66 z = errorMatrix.Inverse(i);
+    error = i;
+    return z;
+  }
+
+  
   int i = 0;
   AlgebraicSymMatrix66 z = thePredState.perigeeError().weightMatrix(i);
   error = i;
@@ -44,7 +86,40 @@ AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateWeight
 
 AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateError() const {
   if (!jacobiansAvailable)
-    computeJacobians();
+  computeJacobians();
+  
+  if (part->getPhoton() != nullptr)
+  {
+    double px = thePredState.theState().globalMomentum().x();
+    double py = thePredState.theState().globalMomentum().y();
+    double pz = thePredState.theState().globalMomentum().z();
+
+    AlgebraicSymMatrix44 originalError;
+    TMatrixD posCov = *(part->getPhotonCov());
+    float ECov = part->getPhoton()->superCluster()->correctedEnergyUncertainty();
+
+    for (int i = 0; i < 3; i++)
+    {
+      for (int j = 0; j < 3; j++)
+      {
+        originalError(i, j) = posCov(i, j);
+      }
+    }
+
+    originalError(3, 3) = ECov * ECov;
+
+    AlgebraicMatrix64 jacobian;
+    jacobian(0, 0) = py;
+    jacobian(0, 1) = -px;
+    jacobian(1, 0) = pz;
+    jacobian(1, 2) = -px;
+    jacobian(2, 3) = 1;
+
+    AlgebraicSymMatrix66 errorMatrix = ROOT::Math::Similarity(jacobian, originalError);
+    return errorMatrix;
+  }
+
+
   return thePredState.perigeeError().covarianceMatrix();
 }
 
@@ -82,7 +157,7 @@ void ParticleKinematicLinearizedTrackState::computeJacobians() const {
   //  bool valid = thePredState.isValid();
   //  if (!valid) std::cout <<"Help!!!!!!!!! State is invalid\n";
   //  if (!valid) return;
-  if (part.getPhoton() != nullptr) {
+  if (part->getPhoton() != nullptr) {
     // photon
     computePhotonJacobians();
   }

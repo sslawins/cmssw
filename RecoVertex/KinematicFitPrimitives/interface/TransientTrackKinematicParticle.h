@@ -8,6 +8,8 @@
 
 #include "DataFormats/EgammaCandidates/interface/Photon.h"
 
+#include "TMatrixD.h"
+
 /**
  * Class representing KinematicParticle
  * created fromTransientTrack. Uses specific
@@ -32,7 +34,8 @@ public:
                                   ReferenceCountingPointer<KinematicParticle> previousParticle,
                                   KinematicStatePropagator* pr,
                                   const reco::TransientTrack* initialTrack = nullptr,
-                                  const reco::Photon* inPhoton = nullptr);
+                                  const reco::Photon* inPhoton = nullptr,
+                                  TMatrixD* inCov = nullptr);
 
   ~TransientTrackKinematicParticle() override;
 
@@ -77,12 +80,14 @@ public:
   RefCountedLinearizedTrackState particleLinearizedTrackState(const GlobalPoint& point) const override;
 
   const reco::Photon* getPhoton() {return photon;}
+  TMatrixD* getPhotonCov() {return photonCov;}
 
 private:
   //initial TransientTrack (if any)
   const reco::TransientTrack* inTrack;
 
   const reco::Photon* photon;
+  TMatrixD* photonCov;
 
 
   //propagator for kinematic states
