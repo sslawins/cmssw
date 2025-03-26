@@ -9,6 +9,8 @@
 #include "RecoVertex/KinematicFitPrimitives/interface/TransientTrackKinematicParticle.h"
 #include "RecoVertex/KinematicFitPrimitives/interface/KinematicConstraint.h"
 
+#include "TMatrixD.h"
+
 /**
  *.Factory for KinematicParticle RefCountedPointers
  */
@@ -40,7 +42,8 @@ public:
                                        float chiSquared,
                                        float degreesOfFr,
                                        float& m_sigma,
-                                       const reco::Photon* inPhoton = nullptr) const;
+                                       const reco::Photon* inPhoton = nullptr,
+                                       TMatrixD*  = nullptr) const;
 
   /**
  * Particle constructed out of corresponding TransientTrack,
