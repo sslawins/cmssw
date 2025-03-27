@@ -11,6 +11,9 @@
 
 #include "TMatrixD.h"
 
+#include "DataFormats/GeometrySurface/interface/ReferenceCounted.h"
+
+
 /**
  *.Factory for KinematicParticle RefCountedPointers
  */

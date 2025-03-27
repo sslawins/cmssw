@@ -8,6 +8,9 @@
 
 #include "DataFormats/EgammaCandidates/interface/Photon.h"
 
+#include "DataFormats/GeometrySurface/interface/ReferenceCounted.h"
+
+
 #include "TMatrixD.h"
 
 /**
@@ -80,7 +83,9 @@ public:
   RefCountedLinearizedTrackState particleLinearizedTrackState(const GlobalPoint& point) const override;
 
   const reco::Photon* getPhoton() {return photon;}
-  TMatrixD* getPhotonCov() {return photonCov;}
+  TMatrixD* getPhotonCov() {
+    std::cout << "TransientTrackKinematicParticle:getPhotonCov" << std::endl;
+    return photonCov;}
 
 private:
   //initial TransientTrack (if any)

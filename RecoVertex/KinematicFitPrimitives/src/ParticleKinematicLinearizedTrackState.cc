@@ -49,6 +49,8 @@ AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateWeight
     double pz = thePredState.theState().globalMomentum().z();
 
     AlgebraicSymMatrix44 originalError;
+    std::cout << "Photon covariance matrix:" << std::endl;
+    part->getPhotonCov()->Print();
     TMatrixD posCov = *(part->getPhotonCov());
     float ECov = part->getPhoton()->superCluster()->correctedEnergyUncertainty();
 
@@ -70,9 +72,15 @@ AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateWeight
     jacobian(2, 3) = 1;
 
     AlgebraicSymMatrix66 errorMatrix = ROOT::Math::Similarity(jacobian, originalError);
+    std::cout << "Photon error matrix:" << std::endl;
+    errorMatrix.Print(std::cout);
+
     int i = 0;
     AlgebraicSymMatrix66 z = errorMatrix.Inverse(i);
     error = i;
+    std::cout << "Photon weight matrix:" << std::endl;
+    z.Print(std::cout);
+    
     return z;
   }
 
@@ -116,6 +124,8 @@ AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateError(
     jacobian(2, 3) = 1;
 
     AlgebraicSymMatrix66 errorMatrix = ROOT::Math::Similarity(jacobian, originalError);
+    std::cout << "Photon error matrix:" << std::endl;
+    errorMatrix.Print(std::cout);
     return errorMatrix;
   }
 

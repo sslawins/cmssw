@@ -95,6 +95,7 @@ CachingVertex<N> SequentialVertexFitter<N>::vertex(const std::vector<RefCountedV
   AlgebraicSymMatrix33 we(id);
   GlobalError error(we * 10000);
   VertexState state(linP, error);
+  std::cout << "sequential vertex fitter: fit" << std::endl;
   return fit(tracks, state, false);
 }
 
@@ -237,10 +238,12 @@ CachingVertex<N> SequentialVertexFitter<N>::fit(const std::vector<RefCountedVert
     for (typename std::vector<RefCountedVertexTrack>::const_iterator i = globalVTracks.begin();
          i != globalVTracks.end();
          i++) {
+      std::cout << "theUpdator->add" << std::endl;
       fVertex = theUpdator->add(fVertex, *i);
       if (!fVertex.isValid())
         break;
     }
+    std::cout << "theUpdator->add done" << std::endl;
 
     validVertex = fVertex.isValid();
     // check tracker bounds and NaN in position

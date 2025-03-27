@@ -1,3 +1,5 @@
+<flags CXXFLAGS="-g"/>
+
 <use name="RecoVertex/KalmanVertexFit"/>
 <export>
   <lib name="1"/>
