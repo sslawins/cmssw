@@ -326,9 +326,6 @@ void Test::analyze(
         RefCountedKinematicParticle mu1 = muonKinematicParticles.at(i);
         RefCountedKinematicParticle mu2 = muonKinematicParticles.at(j);
         RefCountedKinematicParticle pho = photonKinematicParticles.at(k);
-
-        
-
         std::vector<RefCountedKinematicParticle> allParticles;
         allParticles.push_back(mu1);
         allParticles.push_back(mu2);
