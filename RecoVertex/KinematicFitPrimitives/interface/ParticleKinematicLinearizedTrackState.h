@@ -11,6 +11,9 @@
 #include "RecoVertex/KinematicFitPrimitives/interface/Matrices.h"
 
 #include "TMatrixD.h"
+#include "RecoVertex/KinematicFitPrimitives/interface/KinematicParameters.h"
+#include "RecoVertex/KinematicFitPrimitives/interface/KinematicParametersError.h"
+#include "RecoVertex/KinematicFitPrimitives/interface/KinematicState.h"
 
 class ParticleKinematicLinearizedTrackState : public LinearizedTrackState<6> {
 public:

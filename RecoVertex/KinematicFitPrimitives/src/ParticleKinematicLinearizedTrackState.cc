@@ -1,6 +1,8 @@
 #include "RecoVertex/KinematicFitPrimitives/interface/ParticleKinematicLinearizedTrackState.h"
+#include "RecoVertex/KinematicFitPrimitives/interface/KinematicParameters.h"
 #include "RecoVertex/KinematicFitPrimitives/interface/KinematicRefittedTrackState.h"
 #include "RecoVertex/KinematicFitPrimitives/interface/KinematicPerigeeConversions.h"
+#include "RecoVertex/KinematicFitPrimitives/interface/KinematicState.h"
 
 const AlgebraicVector6& ParticleKinematicLinearizedTrackState::constantTerm() const {
   if (!jacobiansAvailable)
@@ -27,15 +29,30 @@ const AlgebraicVector6& ParticleKinematicLinearizedTrackState::parametersFromExp
 }
 
 AlgebraicVector6 ParticleKinematicLinearizedTrackState::predictedStateParameters() const {
+  if (!jacobiansAvailable)
+    computeJacobians();
+
+  // this is the measurement
   if (part->getPhoton() != nullptr)
   {
     AlgebraicVector6 z;
+    double my = part->getPhoton()->caloPosition().y();
+    double mz = part->getPhoton()->caloPosition().z();
+    double mE = part->getPhoton()->energy();
+    double mass = part->currentState().mass();
+
+
+    z(0) = my;
+    z(1) = mz;
+    z(2) = mE;
+    z(3) = mass;
+    std::cout << "Photon predicted state parameters:" << std::endl;
+    z.Print(std::cout);
+    std::cout << std::endl;
     return z;
   }
-
-  if (!jacobiansAvailable)
-    computeJacobians();
-  return thePredState.perigeeParameters().vector();
+  else
+    return thePredState.perigeeParameters().vector();
 }
 
 AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateWeight(int& error) const {
@@ -44,10 +61,6 @@ AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateWeight
 
   if (part->getPhoton() != nullptr)
   {
-    double px = thePredState.theState().globalMomentum().x();
-    double py = thePredState.theState().globalMomentum().y();
-    double pz = thePredState.theState().globalMomentum().z();
-
     AlgebraicSymMatrix44 originalError;
 
     TMatrixD posCov = *(part->getPhotonCov());
@@ -63,20 +76,18 @@ AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateWeight
 
     originalError(3, 3) = ECov * ECov;
 
-    std::cout << "Photon original error matrix:" << std::endl;
-    originalError.Print(std::cout);
-    std::cout << std::endl;
+    // std::cout << "Photon original error matrix:" << std::endl;
+    // originalError.Print(std::cout);
+    // std::cout << std::endl;
 
     AlgebraicMatrix64 jacobian;
-    jacobian(0, 0) = py;
-    jacobian(0, 1) = -px;
-    jacobian(1, 0) = pz;
-    jacobian(1, 2) = -px;
+    jacobian(0, 1) = 1;
+    jacobian(1, 2) = 1;
     jacobian(2, 3) = 1;
 
-    std::cout << "Photon jacobian matrix:" << std::endl;
-    jacobian.Print(std::cout);
-    std::cout << std::endl;
+    // std::cout << "Photon jacobian matrix:" << std::endl;
+    // jacobian.Print(std::cout);
+    // std::cout << std::endl;
 
     AlgebraicSymMatrix66 errorMatrix = ROOT::Math::Similarity(jacobian, originalError);
     errorMatrix(3, 3) = 1e-5;
@@ -112,10 +123,6 @@ AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateError(
   
   if (part->getPhoton() != nullptr)
   {
-    double px = thePredState.theState().globalMomentum().x();
-    double py = thePredState.theState().globalMomentum().y();
-    double pz = thePredState.theState().globalMomentum().z();
-
     AlgebraicSymMatrix44 originalError;
     TMatrixD posCov = *(part->getPhotonCov());
     float ECov = part->getPhoton()->superCluster()->correctedEnergyUncertainty();
@@ -131,15 +138,16 @@ AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateError(
     originalError(3, 3) = ECov * ECov;
 
     AlgebraicMatrix64 jacobian;
-    jacobian(0, 0) = py;
-    jacobian(0, 1) = -px;
-    jacobian(1, 0) = pz;
-    jacobian(1, 2) = -px;
+    jacobian(0, 1) = 1;
+    jacobian(1, 2) = 1;
     jacobian(2, 3) = 1;
 
     AlgebraicSymMatrix66 errorMatrix = ROOT::Math::Similarity(jacobian, originalError);
-    std::cout << "Photon error matrix:" << std::endl;
-    errorMatrix.Print(std::cout);
+    errorMatrix(3, 3) = 1e-5;
+    errorMatrix(4, 4) = 1e-5;
+    errorMatrix(5, 5) = 1e-5;
+    // std::cout << "Photon error matrix:" << std::endl;
+    // errorMatrix.Print(std::cout);
     return errorMatrix;
   }
 
@@ -205,23 +213,55 @@ ParticleKinematicLinearizedTrackState::RefCountedRefittedTrackState
 ParticleKinematicLinearizedTrackState::createRefittedTrackState(const GlobalPoint& vertexPosition,
                                                                 const AlgebraicVector4& vectorParameters,
                                                                 const AlgebraicSymMatrix77& covarianceMatrix) const {
-  KinematicPerigeeConversions conversions;
-  KinematicState lst = conversions.kinematicState(
-      vectorParameters, vertexPosition, charge(), covarianceMatrix, part->currentState().magneticField());
-  RefCountedRefittedTrackState rst =
-      RefCountedRefittedTrackState(new KinematicRefittedTrackState(lst, vectorParameters));
-  return rst;
+  if(part->getPhoton() != nullptr)
+  {
+    AlgebraicVector7 par;
+    par(0) = vertexPosition.x();
+    par(1) = vertexPosition.y();
+    par(2) = vertexPosition.z();
+    par(3) = vectorParameters(0);
+    par(4) = vectorParameters(1);
+    par(5) = vectorParameters(2);
+    par(6) = vectorParameters(3);
+    KinematicParameters kPar(par);
+    KinematicParametersError kParErr(covarianceMatrix);
+
+    KinematicState lst = KinematicState(kPar, kParErr, part->currentState().particleCharge(), part->currentState().magneticField());
+    RefCountedRefittedTrackState rst = RefCountedRefittedTrackState(new KinematicRefittedTrackState(lst, vectorParameters));
+    return rst;
+  }
+  else
+  {
+    KinematicPerigeeConversions conversions;
+    KinematicState lst = conversions.kinematicState(
+        vectorParameters, vertexPosition, charge(), covarianceMatrix, part->currentState().magneticField());
+    RefCountedRefittedTrackState rst =
+        RefCountedRefittedTrackState(new KinematicRefittedTrackState(lst, vectorParameters));
+    return rst;
+  }
 }
 
 AlgebraicVector4 ParticleKinematicLinearizedTrackState::predictedStateMomentumParameters() const {
   if (!jacobiansAvailable)
     computeJacobians();
-  AlgebraicVector4 res;
-  res[0] = thePredState.perigeeParameters().vector()(0);
-  res[1] = thePredState.perigeeParameters().vector()(1);
-  res[2] = thePredState.perigeeParameters().vector()(2);
-  res[3] = thePredState.perigeeParameters().vector()(5);
-  return res;
+  if (part->getPhoton() != nullptr)
+  {
+    AlgebraicVector4 res;
+    res[0] = thePredState.theState().globalMomentum().x();
+    res[1] = thePredState.theState().globalMomentum().y();
+    res[2] = thePredState.theState().globalMomentum().z();
+    res[3] = thePredState.theState().mass();
+    return res;
+  }
+  else
+  {
+    AlgebraicVector4 res;
+    res[0] = thePredState.perigeeParameters().vector()(0);
+    res[1] = thePredState.perigeeParameters().vector()(1);
+    res[2] = thePredState.perigeeParameters().vector()(2);
+    res[3] = thePredState.perigeeParameters().vector()(5);
+    return res;
+  }
 }
 
 AlgebraicSymMatrix44 ParticleKinematicLinearizedTrackState::predictedStateMomentumError() const {
@@ -250,33 +290,50 @@ std::vector<ReferenceCountingPointer<LinearizedTrackState<6> > > ParticleKinemat
 
 AlgebraicVector6 ParticleKinematicLinearizedTrackState::refittedParamFromEquation(
     const RefCountedRefittedTrackState& theRefittedState) const {
-  AlgebraicVectorM momentum = theRefittedState->momentumVector();
-  if ((momentum(2) * predictedStateMomentumParameters()(2) < 0) && (std::fabs(momentum(2)) > M_PI / 2)) {
-    if (predictedStateMomentumParameters()(2) < 0.)
-      momentum(2) -= 2 * M_PI;
-    if (predictedStateMomentumParameters()(2) > 0.)
-      momentum(2) += 2 * M_PI;
+  if (part->getPhoton() != nullptr)
+  {
+    AlgebraicVectorM momentum = theRefittedState->momentumVector();
+    AlgebraicVector3 vertexPosition;
+    vertexPosition(0) = theRefittedState->position().x();
+    vertexPosition(1) = theRefittedState->position().y();
+    vertexPosition(2) = theRefittedState->position().z();
+    AlgebraicVector6 param = constantTerm() + positionJacobian() * vertexPosition + momentumJacobian() * momentum;
+
+    return param;
   }
+  else
+  {
+    AlgebraicVectorM momentum = theRefittedState->momentumVector();
+    if ((momentum(2) * predictedStateMomentumParameters()(2) < 0) && (std::fabs(momentum(2)) > M_PI / 2)) {
+      if (predictedStateMomentumParameters()(2) < 0.)
+        momentum(2) -= 2 * M_PI;
+      if (predictedStateMomentumParameters()(2) > 0.)
+        momentum(2) += 2 * M_PI;
+    }
 
-  AlgebraicVector3 vertexPosition;
-  vertexPosition(0) = theRefittedState->position().x();
-  vertexPosition(1) = theRefittedState->position().y();
-  vertexPosition(2) = theRefittedState->position().z();
-  AlgebraicVector6 param = constantTerm() + positionJacobian() * vertexPosition + momentumJacobian() * momentum;
+    AlgebraicVector3 vertexPosition;
+    vertexPosition(0) = theRefittedState->position().x();
+    vertexPosition(1) = theRefittedState->position().y();
+    vertexPosition(2) = theRefittedState->position().z();
+    AlgebraicVector6 param = constantTerm() + positionJacobian() * vertexPosition + momentumJacobian() * momentum;
 
-  if (param(2) > M_PI)
-    param(2) -= 2 * M_PI;
-  if (param(2) < -M_PI)
-    param(2) += 2 * M_PI;
+    if (param(2) > M_PI)
+      param(2) -= 2 * M_PI;
+    if (param(2) < -M_PI)
+      param(2) += 2 * M_PI;
 
-  return param;
+    return param;
+  }
 }
 
 void ParticleKinematicLinearizedTrackState::checkParameters(AlgebraicVector6& parameters) const {
-  if (parameters(2) > M_PI)
-    parameters(2) -= 2 * M_PI;
-  if (parameters(2) < -M_PI)
-    parameters(2) += 2 * M_PI;
+  if (part->getPhoton() == nullptr)
+  {
+    if (parameters(2) > M_PI)
+      parameters(2) -= 2 * M_PI;
+    if (parameters(2) < -M_PI)
+      parameters(2) += 2 * M_PI;
+  }
 }
 
 void ParticleKinematicLinearizedTrackState::computeChargedJacobians() const {
@@ -459,15 +516,15 @@ void ParticleKinematicLinearizedTrackState::computePhotonJacobians() const {
 
   double p = sqrt(px * px + py * py + pz * pz);
 
-  thePositionJacobian(0, 0) = py;
-  thePositionJacobian(0, 1) = -px;
-  thePositionJacobian(1, 0) = pz;
-  thePositionJacobian(1, 2) = -px;
+  thePositionJacobian(0, 0) = -py/px;
+  thePositionJacobian(0, 1) = 1;
+  thePositionJacobian(1, 0) = -pz/px;
+  thePositionJacobian(1, 2) = 1;
 
-  theMomentumJacobian(0, 0) = my - vy;
-  theMomentumJacobian(0, 1) = -mx + vx;
-  theMomentumJacobian(1, 0) = mz - vz;
-  theMomentumJacobian(1, 2) = -mx + vx;
+  theMomentumJacobian(0, 0) = -(mx-vx)*py/(px*px);
+  theMomentumJacobian(0, 1) = (mx-vx)/px;
+  theMomentumJacobian(1, 0) = -(mx-vx)*pz/(px*px);
+  theMomentumJacobian(1, 2) = (mx-vx)/px;
   theMomentumJacobian(2, 0) = px/p;
   theMomentumJacobian(2, 1) = py/p;
   theMomentumJacobian(2, 2) = pz/p;
@@ -475,10 +532,10 @@ void ParticleKinematicLinearizedTrackState::computePhotonJacobians() const {
 
 
   // The measurement function h at the expansion point
-  theExpandedParams[0] = (mx - vx) * py - (my - vy) * px;
-  theExpandedParams[1] =(mx - vx) * pz - (mz - vz) * px;
-  theExpandedParams[2] = p - mE;
-  theExpandedParams[3] = 0; // mass is a fixed hypothesis, not fitted
+  theExpandedParams[0] = vy + (mx-vx)*py/px;
+  theExpandedParams[1] = vz + (mx-vx)*pz/px;
+  theExpandedParams[2] = p;
+  theExpandedParams[3] = mass;
   theExpandedParams[4] = 0;
   theExpandedParams[5] = 0;
 
@@ -495,6 +552,20 @@ void ParticleKinematicLinearizedTrackState::computePhotonJacobians() const {
 
   theConstantTerm = AlgebraicVector6(theExpandedParams - thePositionJacobian * expansionPoint -
                                       theMomentumJacobian * momentumAtExpansionPoint);
+
+  std::cout << "Photon Jacobians:" << std::endl;
+  std::cout << "Position Jacobian:" << std::endl;
+  thePositionJacobian.Print(std::cout);
+  std::cout << std::endl;
+  std::cout << "Momentum Jacobian:" << std::endl;
+  theMomentumJacobian.Print(std::cout);
+  std::cout << std::endl;
+  std::cout << "Constant Term:" << std::endl;
+  theConstantTerm.Print(std::cout);
+  std::cout << std::endl;
+  std::cout << "Expanded Parameters:" << std::endl;
+  theExpandedParams.Print(std::cout);
+  std::cout << std::endl;
 
 }
 
