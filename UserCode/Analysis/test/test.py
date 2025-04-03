@@ -15,7 +15,10 @@ process = cms.Process("EenTest", Run3)
 # MessageLogger & co.
 process.load("FWCore.MessageLogger.MessageLogger_cfi")
 process.MessageLogger.cerr.FwkReport.reportEvery = cms.untracked.int32(1)
+process.MessageLogger.suppressWarning  = cms.untracked.vstring('Geometry','AfterSource','L1T')
 process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(False))
+# process.MessageLogger.cerr.threshold = "DEBUG"
+# process.MessageLogger.debugModules = ["*"]
 
 dataDir = '/eos/cms/store/group/phys_bphys/privateMC_ForBsMMGAnalysis/TrackingVertexing/Private_BsToMuMuGamma_MCTunesRun3ECM13p6TeV/BsToMuMuGamma_CMSSW_12_4_11_patch3_14_12_2024/241214_121515/0000/'
 # dataDir = '/eos/cms/store/group/phys_bphys/privateMC_ForBsMMGAnalysis/TrackingVertexing/Private_Pi0ToGammaGamma_Pi0PythiaGun/Pi0ToGammaGamma_CMSSW_12_4_11_patch3_12_12_2024/241212_131944/0000/'
@@ -45,7 +48,7 @@ print('Number of files: ', len(files))
 # process.source = cms.Source('PoolSource', fileNames =cms.untracked.vstring("file:") )
 process.source = cms.Source('PoolSource', fileNames =cms.untracked.vstring(files) )
 process.source.skipEvents = cms.untracked.uint32(0)
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(1000))
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(10000))
 
 process.load("TrackingTools/TransientTrack/TransientTrackBuilder_cfi")
 
@@ -58,13 +61,6 @@ process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 from Configuration.AlCa.GlobalTag import GlobalTag
 # process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:run3_data', '')
 process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:run3_mc_FULL','')
-
-
-process.load('FWCore.MessageService.MessageLogger_cfi')
-process.MessageLogger.cerr.FwkReport.reportEvery = cms.untracked.int32(1)
-process.MessageLogger.suppressWarning  = cms.untracked.vstring('Geometry','AfterSource','L1T')
-process.options = cms.untracked.PSet( wantSummary=cms.untracked.bool(False))
-
 
 
 process.analiza= cms.EDAnalyzer("Test",

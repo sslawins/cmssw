@@ -69,6 +69,7 @@
 #include <iomanip> 
 #include <utility>
 #include <numeric>
+#include <vector>
 
 
 using namespace std;
@@ -118,6 +119,9 @@ private:
   TH1D* hGammaPt;
   TH1D* hGammaDeltaR;
   TH1D* hGammaPtWithTrigger;
+  
+  TH1D* hDistance;
+  TH1D* hPhotonCosineSimilarity;
 
 
   int nConvPhotons = 0;
@@ -175,6 +179,9 @@ void Test::beginJob()
   hGammaDeltaR = new TH1D("hGammaDeltaR", "hGammaDeltaR", 100, 0, 0.05);
   hGammaPtWithTrigger = new TH1D("hGammaPtWithTrigger", "hGammaPtWithTrigger", 100, 0, 30);
 
+  hDistance = new TH1D("hDistance", "hDistance", 100, 0, 0.1);
+  hPhotonCosineSimilarity = new TH1D("hPhotonCosineSimilarity", "hPhotonCosineSimilarity", 100, -1, 1);
+
   cout << "HERE Test::beginJob()" << endl;
 }
 
@@ -192,6 +199,9 @@ void Test::endJob()
   hGammaDeltaR->Write();
   hGammaPtWithTrigger->Write();
 
+  hDistance->Write();
+  hPhotonCosineSimilarity->Write();
+  
   myRootFile.Close();
 
   delete hBsMass;
@@ -201,7 +211,8 @@ void Test::endJob()
   delete hGammaDeltaR;
   delete hGammaPtWithTrigger;
 
-
+  delete hDistance;
+  delete hPhotonCosineSimilarity;
 
   cout << "HERE Test::endJob()" << endl;
 }
@@ -228,7 +239,7 @@ void Test::analyze(
   vector<const reco::Candidate*> genMatchedMuons;
 
   vector<const reco::Candidate*> genPhotons;
-  vector<RefCountedKinematicParticle> recoMatchedPhotons;
+  vector<const reco::Photon*> recoMatchedPhotons;
   vector<const reco::Candidate*> genMatchedPhotons;
 
   const reco::BeamSpot & beamSpot = ev.get(theBeamSpotToken);
@@ -245,31 +256,85 @@ void Test::analyze(
   // }
 
 
-  // for(const auto& genP : genPar)
-  // {
-  //   if (abs(genP.pdgId()) == 531)
-  //   {
-  //     vector<int> daughters;
-  //     for(unsigned int i=0; i < genP.numberOfDaughters(); i++)
-  //     {
-  //       daughters.push_back(genP.daughter(i)->pdgId());
-  //     }
-  //     if(isSameDecay(daughters, MuMuG))
-  //     {
-  //       for(unsigned int i=0; i < genP.numberOfDaughters(); i++)
-  //       {
-  //         if(abs(genP.daughter(i)->pdgId()) == 13) genMuons.push_back(genP.daughter(i));
-  //         if(abs(genP.daughter(i)->pdgId()) == 22) genPhotons.push_back(genP.daughter(i));
-  //       }
-  //     }
-  //   }
-  // }
+  for(const auto& genP : genPar)
+  {
+    if (abs(genP.pdgId()) == 531)
+    {
+      vector<int> daughters;
+      for(unsigned int i=0; i < genP.numberOfDaughters(); i++)
+      {
+        daughters.push_back(genP.daughter(i)->pdgId());
+      }
+      if(isSameDecay(daughters, MuMuG))
+      {
+        for(unsigned int i=0; i < genP.numberOfDaughters(); i++)
+        {
+          if(abs(genP.daughter(i)->pdgId()) == 13) genMuons.push_back(genP.daughter(i));
+          if(abs(genP.daughter(i)->pdgId()) == 22) genPhotons.push_back(genP.daughter(i));
+        }
+      }
+    }
+  }
 
-  
+  // reco muon matching
+  for (const reco::Candidate* genMu : genMuons)
+  {
+    float minDR = 10;
+    const reco::Muon* bestMatchedMuon;
+    bool matched = false;
+    for (const auto& recoMu : recoMuons)
+    {
+      float dR = reco::deltaR(recoMu, *genMu);
+      if (dR < minDR)
+      {
+        minDR = dR;
+        bestMatchedMuon = &recoMu;
+        matched = true;
+      }
+    }
+    // if (matched) hMuDeltaR->Fill(minDR);
+    if (matched && minDR < 0.01)
+    {
+      recoMatchedMuons.push_back(bestMatchedMuon);
+      genMatchedMuons.push_back(genMu);
+      // hRecoVsGenMuPt->Fill(genMu->pt(), bestMatchedMuon->pt());
+      // hMuPtError->Fill((bestMatchedMuon->pt() - genMu->pt())/genMu->pt());
+    }
+  }
+
+  // reco photon matching
+  for (const reco::Candidate* genPh : genPhotons)
+  {
+    float minDR = 10;
+    const reco::Photon* bestMatchedPhoton;
+    bool matched = false;
+    for (const auto& recoPh : recoPhotons)
+    {
+      float dR = reco::deltaR(recoPh, *genPh);
+      if (dR < minDR)
+      {
+        minDR = dR;
+        bestMatchedPhoton = &recoPh;
+        matched = true;
+      }
+    }
+    // if (matched) hGammaDeltaR->Fill(minDR);
+    if (matched && minDR < 0.02)
+    {
+      recoMatchedPhotons.push_back(bestMatchedPhoton);
+      genMatchedPhotons.push_back(genPh);
+      // hRecoVsGenGammaPt->Fill(genPh->pt(), bestMatchedPhoton->pt());
+      // hGammaPtError->Fill((bestMatchedPhoton->pt() - genPh->pt())/genPh->pt());
+    }
+  }
+
+
+  // kinematic particle creation
   
   vector<RefCountedKinematicParticle> muonKinematicParticles;
-  for(const auto& recoMu : recoMuons)
+  for(const auto& recoMuPtr : recoMatchedMuons)
   {
+    reco::Muon recoMu = *recoMuPtr;
     hMuPt->Fill(recoMu.pt());
     reco::TrackRef muTrack = recoMu.track();
     if(!muTrack) continue;
@@ -283,9 +348,13 @@ void Test::analyze(
   }
 
   vector<RefCountedKinematicParticle> photonKinematicParticles;
-  for(const auto& recoPho : recoPhotons)
+  for(const auto& recoPhoPtr : recoMatchedPhotons)
   {
+    reco::Photon recoPho = *recoPhoPtr;
     if(recoPho.isEB() == 0) continue;
+
+    cout << "photon calo position:" << recoPho.caloPosition() << endl;
+    cout << "photon energy:" << recoPho.energy() << endl;
 
     hGammaPt->Fill(recoPho.pt());
     GlobalPoint vtx(primaryVertices[0].position().x(), primaryVertices[0].position().y(), primaryVertices[0].position().z());
@@ -302,7 +371,7 @@ void Test::analyze(
     TMatrixD cov(lazyTools.covariancesXYZ(*recoPho.superCluster()));
     TMatrixD* covPtr(new TMatrixD(cov));
 
-    cov.Print();
+    // cov.Print();
     
     AlgebraicSymMatrix66 photonCov{ROOT::Math::SMatrixIdentity()};
     AlgebraicVector6 diagonal(1., 1., 1., 1., 1., 1.);
@@ -313,7 +382,7 @@ void Test::analyze(
 
     reco::TransientTrack phoTT = theB->build(fts);
     KinematicParticleFactoryFromTransientTrack pFactory;
-    photonKinematicParticles.push_back(pFactory.particle(phoTT, photon_mass, float(0), float(0), photon_sigma, &recoPho, covPtr));
+    photonKinematicParticles.push_back(pFactory.particle(phoTT, photon_mass, float(0), float(0), photon_sigma, recoPhoPtr, covPtr));
 
   }
 
@@ -331,6 +400,8 @@ void Test::analyze(
         allParticles.push_back(mu2);
         allParticles.push_back(pho);
 
+        GlobalVector initialPhotonMomentum = pho->currentState().kinematicParameters().momentum();
+        
         const ParticleMass bs_mass = 5.366;
 
         // MultiTrackKinematicConstraint* bs_mass_constraint = new MultiTrackMassKinematicConstraint(bs_mass, 3);
@@ -350,9 +421,27 @@ void Test::analyze(
         // invariant mass
         hBsMass->Fill(fitParticle->currentState().mass());
 
-        // lifetime
+        GlobalPoint fittedGlobalPoint = fitVertex->position();
+        reco::Candidate::Point genPoint = genMuons[0]->vertex();
 
+        reco::Candidate::Point fittedPoint(fittedGlobalPoint.x(), fittedGlobalPoint.y(), fittedGlobalPoint.z());
 
+        hDistance->Fill((fittedPoint - genPoint).R());
+
+        // cosine similarity between initial and refitted photon momentum
+        vertexFitTree->movePointerToTheFirstChild();
+        vertexFitTree->movePointerToTheNextChild();
+        vertexFitTree->movePointerToTheNextChild();
+        if(vertexFitTree->currentParticle()->currentState().mass() == 0)
+        {
+          RefCountedKinematicParticle refittedPhoton = vertexFitTree->currentParticle();
+          GlobalVector refittedPhotonMomentum = refittedPhoton->currentState().kinematicParameters().momentum();
+          double cosineSimilarity = refittedPhotonMomentum.dot(initialPhotonMomentum) / (refittedPhotonMomentum.mag() * initialPhotonMomentum.mag());
+          hPhotonCosineSimilarity->Fill(cosineSimilarity);
+
+          cout << "initial photon momentum: " << initialPhotonMomentum.x() << " " << initialPhotonMomentum.y() << " " << initialPhotonMomentum.z() << endl;
+          cout << "refitted photon momentum: " << refittedPhotonMomentum.x() << " " << refittedPhotonMomentum.y() << " " << refittedPhotonMomentum.z() << endl;
+        }
       }
     }
   }
