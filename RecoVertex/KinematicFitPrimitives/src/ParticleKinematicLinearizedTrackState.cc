@@ -46,9 +46,9 @@ AlgebraicVector6 ParticleKinematicLinearizedTrackState::predictedStateParameters
     z(1) = mz;
     z(2) = mE;
     z(3) = mass;
-    std::cout << "Photon predicted state parameters:" << std::endl;
-    z.Print(std::cout);
-    std::cout << std::endl;
+    // std::cout << "Photon predicted state parameters:" << std::endl;
+    // z.Print(std::cout);
+    // std::cout << std::endl;
     return z;
   }
   else
@@ -94,17 +94,17 @@ AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateWeight
     errorMatrix(4, 4) = 1e-5;
     errorMatrix(5, 5) = 1e-5;
 
-    std::cout << "Photon error matrix after transformation:" << std::endl;
-    errorMatrix.Print(std::cout);
-    std::cout << std::endl;
+    // std::cout << "Photon error matrix after transformation:" << std::endl;
+    // errorMatrix.Print(std::cout);
+    // std::cout << std::endl;
 
     int i = 0;
     AlgebraicSymMatrix66 z = errorMatrix.Inverse(i);
     error = i;
 
-    std::cout << "Photon weight matrix:" << std::endl;
-    z.Print(std::cout);
-    std::cout << std::endl;
+    // std::cout << "Photon weight matrix:" << std::endl;
+    // z.Print(std::cout);
+    // std::cout << std::endl;
     
     return z;
   }
@@ -553,19 +553,19 @@ void ParticleKinematicLinearizedTrackState::computePhotonJacobians() const {
   theConstantTerm = AlgebraicVector6(theExpandedParams - thePositionJacobian * expansionPoint -
                                       theMomentumJacobian * momentumAtExpansionPoint);
 
-  std::cout << "Photon Jacobians:" << std::endl;
-  std::cout << "Position Jacobian:" << std::endl;
-  thePositionJacobian.Print(std::cout);
-  std::cout << std::endl;
-  std::cout << "Momentum Jacobian:" << std::endl;
-  theMomentumJacobian.Print(std::cout);
-  std::cout << std::endl;
-  std::cout << "Constant Term:" << std::endl;
-  theConstantTerm.Print(std::cout);
-  std::cout << std::endl;
-  std::cout << "Expanded Parameters:" << std::endl;
-  theExpandedParams.Print(std::cout);
-  std::cout << std::endl;
+  // std::cout << "Photon Jacobians:" << std::endl;
+  // std::cout << "Position Jacobian:" << std::endl;
+  // thePositionJacobian.Print(std::cout);
+  // std::cout << std::endl;
+  // std::cout << "Momentum Jacobian:" << std::endl;
+  // theMomentumJacobian.Print(std::cout);
+  // std::cout << std::endl;
+  // std::cout << "Constant Term:" << std::endl;
+  // theConstantTerm.Print(std::cout);
+  // std::cout << std::endl;
+  // std::cout << "Expanded Parameters:" << std::endl;
+  // theExpandedParams.Print(std::cout);
+  // std::cout << std::endl;
 
 }
 

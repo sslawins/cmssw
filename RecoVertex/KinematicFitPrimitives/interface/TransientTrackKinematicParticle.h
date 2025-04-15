@@ -84,7 +84,6 @@ public:
 
   const reco::Photon* getPhoton() {return photon;}
   TMatrixD* getPhotonCov() {
-    std::cout << "TransientTrackKinematicParticle:getPhotonCov" << std::endl;
     return photonCov;}
 
 private:

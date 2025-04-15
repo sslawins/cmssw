@@ -55,9 +55,7 @@ RefCountedKinematicTree KinematicParticleVertexFitter::fit(
   std::vector<RefCountedKinematicParticle> &newPart = input.first;
   std::vector<FreeTrajectoryState> &freeStates = input.second;
 
-  std::cout << "lin point finder" << std::endl;
   GlobalPoint linPoint = pointFinder->getLinearizationPoint(freeStates);
-  std::cout << "lin point found" << std::endl;
 
   // cout<<"Linearization point found"<<endl;
 
@@ -87,13 +85,11 @@ RefCountedKinematicTree KinematicParticleVertexFitter::fit(
   // //   cout<<"constant term"<<(*i)->linearizedTrack()->constantTerm()<<endl;
   //
   //  }
-  std::cout << "fitter->vertex" << std::endl;
   CachingVertex<6> vtx = fitter->vertex(ttf);
   if (!vtx.isValid()) {
     LogDebug("RecoVertex/KinematicParticleVertexFitter") << "Fitted position is invalid. Returned Tree is invalid\n";
     return ReferenceCountingPointer<KinematicTree>(new KinematicTree());  // return invalid vertex
   }
   FinalTreeBuilder tBuilder;
-  std::cout << "tBuilder.buildTree" << std::endl;
   return tBuilder.buildTree(vtx, newPart);
 }
