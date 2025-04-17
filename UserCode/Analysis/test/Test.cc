@@ -36,6 +36,9 @@
 #include "RecoVertex/KinematicFitPrimitives/interface/MultiTrackKinematicConstraint.h"
 #include "RecoVertex/KinematicFit/interface/MultiTrackMassKinematicConstraint.h"
 #include "RecoVertex/KinematicFit/interface/KinematicConstrainedVertexFitter.h"
+#include "RecoVertex/KinematicFit/interface/PointingKinematicConstraint.h"
+#include "RecoVertex/KinematicFit/interface/SimplePointingConstraint.h"
+#include "RecoVertex/KinematicFit/interface/SmartPointingConstraint.h"
 
 
 #include "TrackingTools/TrajectoryState/interface/FreeTrajectoryState.h"
@@ -56,6 +59,7 @@
 #include "DataFormats/BeamSpot/interface/BeamSpot.h"
 
 #include "DataFormats/GeometrySurface/interface/ReferenceCounted.h"
+
 
 
 #include "TH1D.h"
@@ -114,6 +118,7 @@ private:
   // histograms
 
   TH1D* hBsMass;
+  TH1D* hBsMassPointing;
   TH1D* hBsMassFromP4;
   TH1D* hMuPt;
   TH1D* hGammaPt;
@@ -121,7 +126,11 @@ private:
   TH1D* hGammaPtWithTrigger;
   
   TH1D* hDistance;
+  TH1D* hDistancePointing;
   TH1D* hPhotonCosineSimilarity;
+  TH1D* h2vs3Distance;
+  TH1D* hNormalVsPointingDistance;
+  TH1D* hDistanceFromPV;
 
 
   int nConvPhotons = 0;
@@ -173,6 +182,7 @@ void Test::beginJob()
   //create a histogram
 
   hBsMass = new TH1D("hBsMass", "hBsMass", 50, 3, 7);
+  hBsMassPointing = new TH1D("hBsMassPointing", "hBsMassPointing", 50, 3, 7);
   hBsMassFromP4 = new TH1D("hBsMassFromP4", "hBsMassFromP4", 50, 3, 7);
   hMuPt = new TH1D("hMuPt", "hMuPt", 100, 0, 30);
   hGammaPt = new TH1D("hGammaPt", "hGammaPt", 100, 0, 30);
@@ -180,7 +190,11 @@ void Test::beginJob()
   hGammaPtWithTrigger = new TH1D("hGammaPtWithTrigger", "hGammaPtWithTrigger", 100, 0, 30);
 
   hDistance = new TH1D("hDistance", "hDistance", 100, 0, 0.1);
+  hDistancePointing = new TH1D("hDistancePointing", "hDistancePointing", 100, 0, 0.1);
   hPhotonCosineSimilarity = new TH1D("hPhotonCosineSimilarity", "hPhotonCosineSimilarity", 100, -1, 1);
+  h2vs3Distance = new TH1D("h2vs3Distance", "h2vs3Distance", 100, 0, 0.1);
+  hNormalVsPointingDistance = new TH1D("hNormalVsPointingDistance", "hNormalVsPointingDistance", 100, 0, 0.02);
+  hDistanceFromPV = new TH1D("hDistanceFromPV", "hDistanceFromPV", 100, 0, 0.5);
 
   cout << "HERE Test::beginJob()" << endl;
 }
@@ -193,6 +207,7 @@ void Test::endJob()
   //write histogram data
 
   hBsMass->Write();
+  hBsMassPointing->Write();
   hBsMassFromP4->Write();
   hMuPt->Write();
   hGammaPt->Write();
@@ -200,11 +215,16 @@ void Test::endJob()
   hGammaPtWithTrigger->Write();
 
   hDistance->Write();
+  hDistancePointing->Write();
   hPhotonCosineSimilarity->Write();
+  h2vs3Distance->Write();
+  hNormalVsPointingDistance->Write();
+  hDistanceFromPV->Write();
   
   myRootFile.Close();
 
   delete hBsMass;
+  delete hBsMassPointing;
   delete hBsMassFromP4;
   delete hMuPt;
   delete hGammaPt;
@@ -212,7 +232,11 @@ void Test::endJob()
   delete hGammaPtWithTrigger;
 
   delete hDistance;
+  delete hDistancePointing;
   delete hPhotonCosineSimilarity;
+  delete h2vs3Distance;
+  delete hNormalVsPointingDistance;
+  delete hDistanceFromPV;
 
   cout << "HERE Test::endJob()" << endl;
 }
@@ -353,8 +377,8 @@ void Test::analyze(
     reco::Photon recoPho = *recoPhoPtr;
     if(recoPho.isEB() == 0) continue;
 
-    cout << "photon calo position:" << recoPho.caloPosition() << endl;
-    cout << "photon energy:" << recoPho.energy() << endl;
+    // cout << "photon calo position:" << recoPho.caloPosition() << endl;
+    // cout << "photon energy:" << recoPho.energy() << endl;
 
     hGammaPt->Fill(recoPho.pt());
     GlobalPoint vtx(primaryVertices[0].position().x(), primaryVertices[0].position().y(), primaryVertices[0].position().z());
@@ -371,7 +395,6 @@ void Test::analyze(
     TMatrixD cov(lazyTools.covariancesXYZ(*recoPho.superCluster()));
     TMatrixD* covPtr(new TMatrixD(cov));
 
-    // cov.Print();
     
     AlgebraicSymMatrix66 photonCov{ROOT::Math::SMatrixIdentity()};
     AlgebraicVector6 diagonal(1., 1., 1., 1., 1., 1.);
@@ -401,32 +424,75 @@ void Test::analyze(
         allParticles.push_back(pho);
 
         GlobalVector initialPhotonMomentum = pho->currentState().kinematicParameters().momentum();
-        
         const ParticleMass bs_mass = 5.366;
-
-        // MultiTrackKinematicConstraint* bs_mass_constraint = new MultiTrackMassKinematicConstraint(bs_mass, 3);
 
         KinematicParticleVertexFitter fitter;
         cout << "Fitting" << endl;
         RefCountedKinematicTree vertexFitTree = fitter.fit(allParticles);
 
         if (!vertexFitTree->isValid()) continue;
-
+        // get the fitted particle and vertex
         vertexFitTree->movePointerToTheTop();
         RefCountedKinematicParticle fitParticle = vertexFitTree->currentParticle();
         RefCountedKinematicVertex fitVertex = vertexFitTree->currentDecayVertex();
-
         if (!fitVertex->vertexIsValid()) continue;
-
-        // invariant mass
-        hBsMass->Fill(fitParticle->currentState().mass());
 
         GlobalPoint fittedGlobalPoint = fitVertex->position();
         reco::Candidate::Point genPoint = genMuons[0]->vertex();
-
         reco::Candidate::Point fittedPoint(fittedGlobalPoint.x(), fittedGlobalPoint.y(), fittedGlobalPoint.z());
 
+        // pointing constraint
+        //
+        GlobalPoint pvGlobalPoint(primaryVertices[0].position().x(), primaryVertices[0].position().y(), primaryVertices[0].position().z());
+        KinematicConstraint* pointingConstraint = new SmartPointingConstraint(pvGlobalPoint);
+        KinematicParticleFitter kinematicFitter;
+        vertexFitTree = kinematicFitter.fit(pointingConstraint, vertexFitTree);
+        if (!vertexFitTree->isValid()) continue;
+
+        // get the fitted particle and vertex
+        vertexFitTree->movePointerToTheTop();
+        RefCountedKinematicParticle fitParticlePointing = vertexFitTree->currentParticle();
+        RefCountedKinematicVertex fitVertexPointing = vertexFitTree->currentDecayVertex();
+        if (!fitVertexPointing->vertexIsValid()) continue;
+
+        GlobalPoint fittedGlobalPointPointing = fitVertexPointing->position();
+        reco::Candidate::Point fittedPointPointing(fittedGlobalPointPointing.x(), fittedGlobalPointPointing.y(), fittedGlobalPointPointing.z());
+
+        hNormalVsPointingDistance->Fill((fittedPoint - fittedPointPointing).R());
+
+        // invariant mass
+        hBsMass->Fill(fitParticle->currentState().mass());
+        hBsMassPointing->Fill(fitParticlePointing->currentState().mass());
+
+        // now do the same but use only the muons
+        std::vector<RefCountedKinematicParticle> muonParticles;
+        muonParticles.push_back(mu1);
+        muonParticles.push_back(mu2);
+        KinematicParticleVertexFitter muonFitter;
+        RefCountedKinematicTree muonVertexFitTree = muonFitter.fit(muonParticles);
+        if (!muonVertexFitTree->isValid()) continue;
+        muonVertexFitTree->movePointerToTheTop();
+        RefCountedKinematicParticle muonFitParticle = muonVertexFitTree->currentParticle();
+        RefCountedKinematicVertex muonFitVertex = muonVertexFitTree->currentDecayVertex();
+        if (!muonFitVertex->vertexIsValid()) continue;
+
+        GlobalPoint muonFittedGlobalPoint = muonFitVertex->position();
+        reco::Candidate::Point muonFittedPoint(muonFittedGlobalPoint.x(), muonFittedGlobalPoint.y(), muonFittedGlobalPoint.z());
+        reco::Candidate::Point muonGenPoint(genMuons[0]->vertex().x(), genMuons[0]->vertex().y(), genMuons[0]->vertex().z());
+        //
+
+
+        h2vs3Distance->Fill((muonFittedPoint - fittedPoint).R());
+
         hDistance->Fill((fittedPoint - genPoint).R());
+        hDistancePointing->Fill((fittedPointPointing - genPoint).R());
+
+        // distance from primary vertex
+        if(primaryVertices.size() > 0)
+        {
+          reco::Candidate::Point pvPoint(primaryVertices[0].position().x(), primaryVertices[0].position().y(), primaryVertices[0].position().z());
+          hDistanceFromPV->Fill((fittedPoint - pvPoint).R());
+        }
 
         // cosine similarity between initial and refitted photon momentum
         vertexFitTree->movePointerToTheFirstChild();
@@ -439,8 +505,6 @@ void Test::analyze(
           double cosineSimilarity = refittedPhotonMomentum.dot(initialPhotonMomentum) / (refittedPhotonMomentum.mag() * initialPhotonMomentum.mag());
           hPhotonCosineSimilarity->Fill(cosineSimilarity);
 
-          cout << "initial photon momentum: " << initialPhotonMomentum.x() << " " << initialPhotonMomentum.y() << " " << initialPhotonMomentum.z() << endl;
-          cout << "refitted photon momentum: " << refittedPhotonMomentum.x() << " " << refittedPhotonMomentum.y() << " " << refittedPhotonMomentum.z() << endl;
         }
       }
     }
