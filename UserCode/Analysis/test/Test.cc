@@ -132,6 +132,7 @@ private:
   TH1D* hNormalVsPointingDistance;
   TH1D* hDistanceFromPV;
 
+  TH1D* hCosSimBsVsSV;
 
   int nConvPhotons = 0;
   std::vector<int> MuMuG = {22, 13, -13};
@@ -196,6 +197,8 @@ void Test::beginJob()
   hNormalVsPointingDistance = new TH1D("hNormalVsPointingDistance", "hNormalVsPointingDistance", 100, 0, 0.02);
   hDistanceFromPV = new TH1D("hDistanceFromPV", "hDistanceFromPV", 100, 0, 0.5);
 
+  hCosSimBsVsSV = new TH1D("hCosSimBsVsSV", "hCosSimBsVsSV", 100, 0, 30);
+
   cout << "HERE Test::beginJob()" << endl;
 }
 
@@ -220,6 +223,8 @@ void Test::endJob()
   h2vs3Distance->Write();
   hNormalVsPointingDistance->Write();
   hDistanceFromPV->Write();
+
+  hCosSimBsVsSV->Write();
   
   myRootFile.Close();
 
@@ -237,6 +242,8 @@ void Test::endJob()
   delete h2vs3Distance;
   delete hNormalVsPointingDistance;
   delete hDistanceFromPV;
+
+  delete hCosSimBsVsSV;
 
   cout << "HERE Test::endJob()" << endl;
 }
@@ -345,6 +352,8 @@ void Test::analyze(
     // if (matched) hGammaDeltaR->Fill(minDR);
     if (matched && minDR < 0.02)
     {
+      reco::Photon* correctedPhoton = new reco::Photon(*bestMatchedPhoton);
+      correctedPhoton->setP4(genPh->p4());
       recoMatchedPhotons.push_back(bestMatchedPhoton);
       genMatchedPhotons.push_back(genPh);
       // hRecoVsGenGammaPt->Fill(genPh->pt(), bestMatchedPhoton->pt());
@@ -444,7 +453,7 @@ void Test::analyze(
         // pointing constraint
         //
         GlobalPoint pvGlobalPoint(primaryVertices[0].position().x(), primaryVertices[0].position().y(), primaryVertices[0].position().z());
-        KinematicConstraint* pointingConstraint = new SmartPointingConstraint(pvGlobalPoint);
+        KinematicConstraint* pointingConstraint = new PointingKinematicConstraint(pvGlobalPoint);
         KinematicParticleFitter kinematicFitter;
         vertexFitTree = kinematicFitter.fit(pointingConstraint, vertexFitTree);
         if (!vertexFitTree->isValid()) continue;
@@ -506,6 +515,10 @@ void Test::analyze(
           hPhotonCosineSimilarity->Fill(cosineSimilarity);
 
         }
+
+        GlobalVector PVToSV = fittedGlobalPoint - pvGlobalPoint;
+        GlobalVector BsMomentum = fitParticle->currentState().kinematicParameters().momentum();
+        hCosSimBsVsSV->Fill(acos(BsMomentum.dot(PVToSV) / (BsMomentum.mag() * PVToSV.mag()))*180./3.14159);
       }
     }
   }
