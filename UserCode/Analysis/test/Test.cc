@@ -22,6 +22,8 @@
 
 #include "DataFormats/Math/interface/deltaR.h"
 
+#include "RecoVertex/KinematicFitPrimitives/interface/Matrices.h"
+#include "RecoVertex/KinematicFitPrimitives/interface/RefCountedKinematicParticle.h"
 #include "TrackingTools/TransientTrack/interface/TransientTrack.h"
 #include "TrackingTools/TransientTrack/interface/TransientTrackBuilder.h"
 #include "TrackingTools/Records/interface/TransientTrackRecord.h"
@@ -39,6 +41,7 @@
 #include "RecoVertex/KinematicFit/interface/PointingKinematicConstraint.h"
 #include "RecoVertex/KinematicFit/interface/SimplePointingConstraint.h"
 #include "RecoVertex/KinematicFit/interface/SmartPointingConstraint.h"
+#include "RecoVertex/KinematicFit/interface/MultiTrackPointingKinematicConstraint.h"
 
 
 #include "TrackingTools/TrajectoryState/interface/FreeTrajectoryState.h"
@@ -118,6 +121,7 @@ private:
   // histograms
 
   TH1D* hBsMass;
+  TH1D* hBsMassGlobal;
   TH1D* hBsMassPointing;
   TH1D* hBsMassFromP4;
   TH1D* hMuPt;
@@ -133,6 +137,8 @@ private:
   TH1D* hDistanceFromPV;
 
   TH1D* hCosSimBsVsSV;
+
+  TH1D* hMomSVPVAngle;
 
   int nConvPhotons = 0;
   std::vector<int> MuMuG = {22, 13, -13};
@@ -183,6 +189,7 @@ void Test::beginJob()
   //create a histogram
 
   hBsMass = new TH1D("hBsMass", "hBsMass", 50, 3, 7);
+  hBsMassGlobal = new TH1D("hBsMassGlobal", "hBsMassGlobal", 50, 3, 7);
   hBsMassPointing = new TH1D("hBsMassPointing", "hBsMassPointing", 50, 3, 7);
   hBsMassFromP4 = new TH1D("hBsMassFromP4", "hBsMassFromP4", 50, 3, 7);
   hMuPt = new TH1D("hMuPt", "hMuPt", 100, 0, 30);
@@ -199,6 +206,8 @@ void Test::beginJob()
 
   hCosSimBsVsSV = new TH1D("hCosSimBsVsSV", "hCosSimBsVsSV", 100, 0, 30);
 
+  hMomSVPVAngle = new TH1D("hMomSVPVAngle", "hMomSVPVAngle", 100, 0, 30);
+
   cout << "HERE Test::beginJob()" << endl;
 }
 
@@ -210,6 +219,7 @@ void Test::endJob()
   //write histogram data
 
   hBsMass->Write();
+  hBsMassGlobal->Write();
   hBsMassPointing->Write();
   hBsMassFromP4->Write();
   hMuPt->Write();
@@ -225,10 +235,13 @@ void Test::endJob()
   hDistanceFromPV->Write();
 
   hCosSimBsVsSV->Write();
+
+  hMomSVPVAngle->Write();
   
   myRootFile.Close();
 
   delete hBsMass;
+  delete hBsMassGlobal;
   delete hBsMassPointing;
   delete hBsMassFromP4;
   delete hMuPt;
@@ -244,6 +257,8 @@ void Test::endJob()
   delete hDistanceFromPV;
 
   delete hCosSimBsVsSV;
+
+  delete hMomSVPVAngle;
 
   cout << "HERE Test::endJob()" << endl;
 }
@@ -286,6 +301,8 @@ void Test::analyze(
   //   cov.Print();
   // }
 
+  GlobalPoint genPV;
+  GlobalPoint genSV;
 
   for(const auto& genP : genPar)
   {
@@ -303,6 +320,8 @@ void Test::analyze(
           if(abs(genP.daughter(i)->pdgId()) == 13) genMuons.push_back(genP.daughter(i));
           if(abs(genP.daughter(i)->pdgId()) == 22) genPhotons.push_back(genP.daughter(i));
         }
+        genPV = GlobalPoint(genP.vx(), genP.vy(), genP.vz());
+        genSV = GlobalPoint(genP.daughter(0)->vx(), genP.daughter(0)->vy(), genP.daughter(0)->vz());
       }
     }
   }
@@ -360,6 +379,7 @@ void Test::analyze(
       // hGammaPtError->Fill((bestMatchedPhoton->pt() - genPh->pt())/genPh->pt());
     }
   }
+
 
 
   // kinematic particle creation
@@ -424,6 +444,8 @@ void Test::analyze(
     {
       for (unsigned int k = 0; k < photonKinematicParticles.size(); k++)
       {
+        hBsMassFromP4->Fill((recoMatchedMuons[i]->p4() + recoMatchedMuons[j]->p4() + recoMatchedPhotons[k]->p4()).M());
+        
         RefCountedKinematicParticle mu1 = muonKinematicParticles.at(i);
         RefCountedKinematicParticle mu2 = muonKinematicParticles.at(j);
         RefCountedKinematicParticle pho = photonKinematicParticles.at(k);
@@ -434,6 +456,8 @@ void Test::analyze(
 
         GlobalVector initialPhotonMomentum = pho->currentState().kinematicParameters().momentum();
         const ParticleMass bs_mass = 5.366;
+
+        GlobalPoint pvGlobalPoint(primaryVertices[0].position().x(), primaryVertices[0].position().y(), primaryVertices[0].position().z());
 
         KinematicParticleVertexFitter fitter;
         cout << "Fitting" << endl;
@@ -450,9 +474,100 @@ void Test::analyze(
         reco::Candidate::Point genPoint = genMuons[0]->vertex();
         reco::Candidate::Point fittedPoint(fittedGlobalPoint.x(), fittedGlobalPoint.y(), fittedGlobalPoint.z());
 
-        // pointing constraint
+        /////////////////////
+        // try global fit
+        /////////////////////
+        KinematicParticleFactoryFromTransientTrack pFactory;
+        vector<RefCountedKinematicParticle> allParticlesGlobal;
+        vertexFitTree->movePointerToTheTop();
+        vertexFitTree->movePointerToTheFirstChild();
+        RefCountedKinematicParticle mu1Global = vertexFitTree->currentParticle();
+        FreeTrajectoryState fts(mu1Global->currentState().globalPosition(), mu1Global->currentState().globalMomentum(), mu1Global->currentState().particleCharge(), &field);
+        AlgebraicSymMatrix66 muonCov;
+        AlgebraicSymMatrix77 muonCov77 = mu1Global->currentState().kinematicParametersError().matrix();
+        for (int i = 0; i < 6; i++)
+        {
+          for (int j = 0; j < 6; j++)
+          {
+            muonCov(i, j) = muonCov77(i, j);
+          }
+        }
+        CartesianTrajectoryError muonErr(muonCov);
+        fts.setCartesianError(muonErr);
+        reco::TransientTrack muonTTGlobal = theB->build(fts);
+        float sigma = 0.001;
+        mu1Global = pFactory.particle(muonTTGlobal, mu1Global->currentState().mass(), float(0), float(0), sigma);
+        allParticlesGlobal.push_back(mu1Global);
+
+        vertexFitTree->movePointerToTheNextChild();
+        RefCountedKinematicParticle mu2Global = vertexFitTree->currentParticle();
+        FreeTrajectoryState fts2(mu2Global->currentState().globalPosition(), mu2Global->currentState().globalMomentum(), mu2Global->currentState().particleCharge(), &field);
+        AlgebraicSymMatrix66 muonCov2;
+        AlgebraicSymMatrix77 muonCov77_2 = mu2Global->currentState().kinematicParametersError().matrix();
+        for (int i = 0; i < 6; i++)
+        {
+          for (int j = 0; j < 6; j++)
+          {
+            muonCov2(i, j) = muonCov77_2(i, j);
+          }
+        }
+        CartesianTrajectoryError muonErr2(muonCov2);
+        fts2.setCartesianError(muonErr2);
+        reco::TransientTrack muonTTGlobal2 = theB->build(fts2);
+        mu2Global = pFactory.particle(muonTTGlobal2, mu2Global->currentState().mass(), float(0), float(0), sigma);
+        allParticlesGlobal.push_back(mu2Global);
+
+        vertexFitTree->movePointerToTheNextChild();
+        RefCountedKinematicParticle phoGlobal = vertexFitTree->currentParticle();
+        FreeTrajectoryState fts3(phoGlobal->currentState().globalPosition(), phoGlobal->currentState().globalMomentum(), phoGlobal->currentState().particleCharge(), &field);
+        AlgebraicSymMatrix66 photonCov;
+        AlgebraicSymMatrix77 photonCov77 = phoGlobal->currentState().kinematicParametersError().matrix();
+        for (int i = 0; i < 6; i++)
+        {
+          for (int j = 0; j < 6; j++)
+          {
+            photonCov(i, j) = photonCov77(i, j);
+          }
+        }
+        CartesianTrajectoryError photonErr(photonCov);
+        fts3.setCartesianError(photonErr);
+        reco::TransientTrack phoTTGlobal = theB->build(fts3);
+        float sigma3 = 0.001;
+        phoGlobal = pFactory.particle(phoTTGlobal, phoGlobal->currentState().mass(), float(0), float(0), sigma3);
+
+        allParticlesGlobal.push_back(phoGlobal);
+
+        vertexFitTree->movePointerToTheTop();
+
+        // create the constraint
+        MultiTrackKinematicConstraint* multiPointingConstraint = new MultiTrackPointingKinematicConstraint(pvGlobalPoint);
+        KinematicConstrainedVertexFitter constrainedFitter;
+        RefCountedKinematicTree vertexFitTreeGlobal = constrainedFitter.fit(allParticlesGlobal, multiPointingConstraint);
+        if (!vertexFitTreeGlobal->isValid()) continue;
+        // get the fitted particle and vertex
+        vertexFitTreeGlobal->movePointerToTheTop();
+        RefCountedKinematicParticle fitParticleGlobal = vertexFitTreeGlobal->currentParticle();
+        RefCountedKinematicVertex fitVertexGlobal = vertexFitTreeGlobal->currentDecayVertex();
+        if (!fitVertexGlobal->vertexIsValid()) continue;
+        GlobalPoint fittedGlobalPointGlobal = fitVertexGlobal->position();
+        reco::Candidate::Point fittedPointGlobal(fittedGlobalPointGlobal.x(), fittedGlobalPointGlobal.y(), fittedGlobalPointGlobal.z());
+        // reco::Candidate::Point genPointGlobal = genMuons[0]->vertex();
+        reco::Candidate::Point pvPointGlobal(primaryVertices[0].position().x(), primaryVertices[0].position().y(), primaryVertices[0].position().z());
+
+        // invariant mass
+        hBsMassGlobal->Fill(fitParticleGlobal->currentState().mass());
+
+        // angle between the bs momentum and the line from the primary vertex to the secondary vertex
+        GlobalVector PVToSVGlobal = fittedGlobalPointGlobal - pvGlobalPoint;
+        GlobalVector BsMomentumGlobal = fitParticleGlobal->currentState().kinematicParameters().momentum();
+        hMomSVPVAngle->Fill(acos(BsMomentumGlobal.dot(PVToSVGlobal) / (BsMomentumGlobal.mag() * PVToSVGlobal.mag()))*180./3.14159);
+
+        //// end of global fit
+        ////
+        ////
+
+        // pointing constraint sequential fit
         //
-        GlobalPoint pvGlobalPoint(primaryVertices[0].position().x(), primaryVertices[0].position().y(), primaryVertices[0].position().z());
         KinematicConstraint* pointingConstraint = new PointingKinematicConstraint(pvGlobalPoint);
         KinematicParticleFitter kinematicFitter;
         vertexFitTree = kinematicFitter.fit(pointingConstraint, vertexFitTree);
