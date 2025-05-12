@@ -373,7 +373,7 @@ void Test::analyze(
     {
       reco::Photon* correctedPhoton = new reco::Photon(*bestMatchedPhoton);
       correctedPhoton->setP4(genPh->p4());
-      recoMatchedPhotons.push_back(bestMatchedPhoton);
+      recoMatchedPhotons.push_back(correctedPhoton);
       genMatchedPhotons.push_back(genPh);
       // hRecoVsGenGammaPt->Fill(genPh->pt(), bestMatchedPhoton->pt());
       // hGammaPtError->Fill((bestMatchedPhoton->pt() - genPh->pt())/genPh->pt());
@@ -474,6 +474,10 @@ void Test::analyze(
         reco::Candidate::Point genPoint = genMuons[0]->vertex();
         reco::Candidate::Point fittedPoint(fittedGlobalPoint.x(), fittedGlobalPoint.y(), fittedGlobalPoint.z());
 
+        GlobalVector PVToSV = fittedGlobalPoint - pvGlobalPoint;
+        GlobalVector BsMomentum = fitParticle->currentState().kinematicParameters().momentum();
+        hCosSimBsVsSV->Fill(acos(BsMomentum.dot(PVToSV) / (BsMomentum.mag() * PVToSV.mag()))*180./3.14159);
+
         /////////////////////
         // try global fit
         /////////////////////
@@ -540,7 +544,7 @@ void Test::analyze(
         vertexFitTree->movePointerToTheTop();
 
         // create the constraint
-        MultiTrackKinematicConstraint* multiPointingConstraint = new MultiTrackPointingKinematicConstraint(pvGlobalPoint);
+        MultiTrackKinematicConstraint* multiPointingConstraint = new MultiTrackPointingKinematicConstraint(genPV);
         KinematicConstrainedVertexFitter constrainedFitter;
         RefCountedKinematicTree vertexFitTreeGlobal = constrainedFitter.fit(allParticlesGlobal, multiPointingConstraint);
         if (!vertexFitTreeGlobal->isValid()) continue;
@@ -568,7 +572,7 @@ void Test::analyze(
 
         // pointing constraint sequential fit
         //
-        KinematicConstraint* pointingConstraint = new PointingKinematicConstraint(pvGlobalPoint);
+        KinematicConstraint* pointingConstraint = new PointingKinematicConstraint(genPV);
         KinematicParticleFitter kinematicFitter;
         vertexFitTree = kinematicFitter.fit(pointingConstraint, vertexFitTree);
         if (!vertexFitTree->isValid()) continue;
@@ -630,10 +634,6 @@ void Test::analyze(
           hPhotonCosineSimilarity->Fill(cosineSimilarity);
 
         }
-
-        GlobalVector PVToSV = fittedGlobalPoint - pvGlobalPoint;
-        GlobalVector BsMomentum = fitParticle->currentState().kinematicParameters().momentum();
-        hCosSimBsVsSV->Fill(acos(BsMomentum.dot(PVToSV) / (BsMomentum.mag() * PVToSV.mag()))*180./3.14159);
       }
     }
   }
