@@ -48,7 +48,7 @@ print('Number of files: ', len(files))
 # process.source = cms.Source('PoolSource', fileNames =cms.untracked.vstring("file:") )
 process.source = cms.Source('PoolSource', fileNames =cms.untracked.vstring(files) )
 process.source.skipEvents = cms.untracked.uint32(0)
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(30000))
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(10000))
 
 process.load("TrackingTools/TransientTrack/TransientTrackBuilder_cfi")
 
