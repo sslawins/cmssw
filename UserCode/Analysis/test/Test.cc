@@ -137,10 +137,12 @@ private:
   TH1D* h2vs3Distance;
   TH1D* hNormalVsPointingDistance;
   TH1D* hDistanceFromPV;
+  TH1D* hDistanceFromPVGlobal;
 
   TH1D* hCosSimBsVsSV;
 
   TH1D* hMomSVPVAngle;
+  TH1D* hMomSVPVAngleGen;
 
   TH1D* hMuonPtResReco;
   TH1D* hMuonPtResFit;
@@ -148,6 +150,7 @@ private:
   TH1D* hPhotonPtResFit;
 
   TH1D* hPVRecoVsGenDistance;
+  TH1D* hPVSVDistanceGen;
 
   int nConvPhotons = 0;
   std::vector<int> MuMuG = {22, 13, -13};
@@ -214,10 +217,12 @@ void Test::beginJob()
   h2vs3Distance = new TH1D("h2vs3Distance", "h2vs3Distance", 100, 0, 0.1);
   hNormalVsPointingDistance = new TH1D("hNormalVsPointingDistance", "hNormalVsPointingDistance", 100, 0, 0.02);
   hDistanceFromPV = new TH1D("hDistanceFromPV", "hDistanceFromPV", 100, 0, 0.5);
+  hDistanceFromPVGlobal = new TH1D("hDistanceFromPVGlobal", "hDistanceFromPVGlobal", 100, 0, 0.5);
 
   hCosSimBsVsSV = new TH1D("hCosSimBsVsSV", "hCosSimBsVsSV", 100, 0, 30);
 
   hMomSVPVAngle = new TH1D("hMomSVPVAngle", "hMomSVPVAngle", 100, 0, 30);
+  hMomSVPVAngleGen = new TH1D("hMomSVPVAngleGen", "hMomSVPVAngleGen", 100, 0, 30);
 
   hMuonPtResReco = new TH1D("hMuonPtResReco", "hMuonPtResReco", 100, -0.1, 0.1);
   hMuonPtResFit = new TH1D("hMuonPtResFit", "hMuonPtResFit", 100, -0.1, 0.1);
@@ -225,6 +230,7 @@ void Test::beginJob()
   hPhotonPtResFit = new TH1D("hPhotonPtResFit", "hPhotonPtResFit", 100, -0.5, 0.5);
 
   hPVRecoVsGenDistance = new TH1D("hPVRecoVsGenDistance", "hPVRecoVsGenDistance", 100, 0, 0.1);
+  hPVSVDistanceGen = new TH1D("hPVSVDistanceGen", "hPVSVDistanceGen", 100, 0, 0.5);
 
   cout << "HERE Test::beginJob()" << endl;
 }
@@ -253,10 +259,12 @@ void Test::endJob()
   h2vs3Distance->Write();
   hNormalVsPointingDistance->Write();
   hDistanceFromPV->Write();
+  hDistanceFromPVGlobal->Write();
 
   hCosSimBsVsSV->Write();
 
   hMomSVPVAngle->Write();
+  hMomSVPVAngleGen->Write();
 
   hMuonPtResReco->Write();
   hMuonPtResFit->Write();
@@ -264,6 +272,7 @@ void Test::endJob()
   hPhotonPtResFit->Write();
 
   hPVRecoVsGenDistance->Write();
+  hPVSVDistanceGen->Write();
   
   myRootFile.Close();
 
@@ -284,10 +293,12 @@ void Test::endJob()
   delete h2vs3Distance;
   delete hNormalVsPointingDistance;
   delete hDistanceFromPV;
+  delete hDistanceFromPVGlobal;
 
   delete hCosSimBsVsSV;
 
   delete hMomSVPVAngle;
+  delete hMomSVPVAngleGen;
 
   delete hMuonPtResReco;
   delete hMuonPtResFit;
@@ -295,6 +306,7 @@ void Test::endJob()
   delete hPhotonPtResFit;
 
   delete hPVRecoVsGenDistance;
+  delete hPVSVDistanceGen;
 
   cout << "HERE Test::endJob()" << endl;
 }
@@ -339,6 +351,7 @@ void Test::analyze(
 
   GlobalPoint genPV;
   GlobalPoint genSV;
+  GlobalVector genBsMomentum;
 
   for(const auto& genP : genPar)
   {
@@ -356,14 +369,31 @@ void Test::analyze(
           if(abs(genP.daughter(i)->pdgId()) == 13) genMuons.push_back(genP.daughter(i));
           if(abs(genP.daughter(i)->pdgId()) == 22) genPhotons.push_back(genP.daughter(i));
         }
-        genPV = GlobalPoint(genP.vx(), genP.vy(), genP.vz());
         genSV = GlobalPoint(genP.daughter(0)->vx(), genP.daughter(0)->vy(), genP.daughter(0)->vz());
+        genBsMomentum = GlobalVector(genP.px(), genP.py(), genP.pz());
+
+        // find the primary vertex
+        const reco::Candidate* mother = genP.mother();
+        while(mother->mother()->pdgId() != 2212)
+        {
+          mother = mother->mother();
+        }
+        genPV = GlobalPoint(mother->vx(), mother->vy(), mother->vz());
+
       }
     }
   }
+
+
   reco::Candidate::Point genPVPoint(genPV.x(), genPV.y(), genPV.z());
   reco::Candidate::Point recoPVPoint(primaryVertices[0].position().x(), primaryVertices[0].position().y(), primaryVertices[0].position().z());
   hPVRecoVsGenDistance->Fill((recoPVPoint - genPVPoint).R());
+
+  GlobalVector genPVToSV = genSV - genPV;
+  hMomSVPVAngleGen->Fill(acos(genBsMomentum.dot(genPVToSV) / (genBsMomentum.mag() * genPVToSV.mag()))*180./3.14159);
+
+  hPVSVDistanceGen->Fill((genPV - genSV).mag());
+
 
   // reco muon matching
   for (const reco::Candidate* genMu : genMuons)
@@ -412,7 +442,7 @@ void Test::analyze(
     {
       reco::Photon* correctedPhoton = new reco::Photon(*bestMatchedPhoton);
       correctedPhoton->setP4(genPh->p4());
-      recoMatchedPhotons.push_back(bestMatchedPhoton);
+      recoMatchedPhotons.push_back(correctedPhoton);
       genMatchedPhotons.push_back(genPh);
       // hRecoVsGenGammaPt->Fill(genPh->pt(), bestMatchedPhoton->pt());
       // hGammaPtError->Fill((bestMatchedPhoton->pt() - genPh->pt())/genPh->pt());
@@ -590,7 +620,7 @@ void Test::analyze(
         vertexFitTree->movePointerToTheTop();
 
         // create the constraint
-        MultiTrackKinematicConstraint* multiPointingConstraint = new MultiTrackPointingKinematicConstraint(pvGlobalPoint);
+        MultiTrackKinematicConstraint* multiPointingConstraint = new MultiTrackPointingKinematicConstraint(genPV);
         KinematicConstrainedVertexFitter constrainedFitter;
         RefCountedKinematicTree vertexFitTreeGlobal = constrainedFitter.fit(allParticlesGlobal, multiPointingConstraint);
         if (!vertexFitTreeGlobal->isValid()) continue;
@@ -613,6 +643,7 @@ void Test::analyze(
         hMomSVPVAngle->Fill(acos(BsMomentumGlobal.dot(PVToSVGlobal) / (BsMomentumGlobal.mag() * PVToSVGlobal.mag()))*180./3.14159);
 
         hDistanceGlobal->Fill((fittedPointGlobal - genPoint).R());
+        hDistanceFromPVGlobal->Fill((fittedPointGlobal - pvPointGlobal).R());
 
         // resolution
         hMuonPtResReco->Fill((genMatchedMuons[i]->pt() - recoMatchedMuons[i]->pt())/genMatchedMuons[i]->pt());
@@ -635,7 +666,7 @@ void Test::analyze(
 
         // pointing constraint sequential fit
         //
-        KinematicConstraint* pointingConstraint = new PointingKinematicConstraint(pvGlobalPoint);
+        KinematicConstraint* pointingConstraint = new PointingKinematicConstraint(genPV);
         KinematicParticleFitter kinematicFitter;
         vertexFitTree = kinematicFitter.fit(pointingConstraint, vertexFitTree);
         if (!vertexFitTree->isValid()) continue;
