@@ -73,7 +73,6 @@ MyFilter::MyFilter(const edm::ParameterSet& conf)
 {
   cout <<" CTORXX" << endl;
 
-  theGenParticleToken = consumes< vector<reco::GenParticle>  >( edm::InputTag("genParticles"));
   theMuonToken = consumes< vector<reco::Muon>  >( edm::InputTag("muons"));
   thePhotonToken = consumes< vector<reco::Photon>  >( edm::InputTag("photons"));
 }
@@ -111,85 +110,13 @@ bool MyFilter::filter(edm::Event& ev, const edm::EventSetup& es)
 {
   std::cout << " -------------------------------- HERE MyFilter::filter "<< std::endl;
 
-  const std::vector<reco::GenParticle> & genPar = ev.get(theGenParticleToken);
   const std::vector<reco::Muon> & recoMuons = ev.get(theMuonToken);
   const std::vector<reco::Photon> & recoPhotons = ev.get(thePhotonToken);
 
 
-  vector<const reco::Candidate*> genMuons;
-  vector<const reco::Muon*> recoMatchedMuons;
-
-  vector<const reco::Candidate*> genPhotons;
-  vector<const reco::Photon*> recoMatchedPhotons;
-
-  for(const auto& genP : genPar)
-  {
-    if (abs(genP.pdgId()) == 531)
-    {
-      vector<int> daughters;
-      for(unsigned int i=0; i < genP.numberOfDaughters(); i++)
-      {
-        daughters.push_back(genP.daughter(i)->pdgId());
-      }
-      if(isSameDecay(daughters, MuMuG))
-      {
-        for(unsigned int i=0; i < genP.numberOfDaughters(); i++)
-        {
-          if(abs(genP.daughter(i)->pdgId()) == 13) genMuons.push_back(genP.daughter(i));
-          if(abs(genP.daughter(i)->pdgId()) == 22) genPhotons.push_back(genP.daughter(i));
-        }
-      }
-    }
-  }
-
-
-  // reco muon matching
-  for (const reco::Candidate* genMu : genMuons)
-  {
-    float minDR = 10;
-    const reco::Muon* bestMatchedMuon;
-    bool matched = false;
-    for (const auto& recoMu : recoMuons)
-    {
-      float dR = reco::deltaR(recoMu, *genMu);
-      if (dR < minDR)
-      {
-        minDR = dR;
-        bestMatchedMuon = &recoMu;
-        matched = true;
-      }
-    }
-    if (matched && minDR < 0.01)
-    {
-      recoMatchedMuons.push_back(bestMatchedMuon);
-    }
-  }
-
-  // reco photon matching
-  for (const reco::Candidate* genPh : genPhotons)
-  {
-    float minDR = 10;
-    const reco::Photon* bestMatchedPhoton;
-    bool matched = false;
-    for (const auto& recoPh : recoPhotons)
-    {
-      float dR = reco::deltaR(recoPh, *genPh);
-      if (dR < minDR)
-      {
-        minDR = dR;
-        bestMatchedPhoton = &recoPh;
-        matched = true;
-      }
-    }
-    if (matched && minDR < 0.02)
-    {
-      recoMatchedPhotons.push_back(bestMatchedPhoton);
-    }
-  }
-
   cout <<"*** Analyze event: " << ev.id() <<" analysed event count:" << ++theEventCount << endl;
 
-  if(recoMatchedMuons.size() >=2 && recoMatchedPhotons.size() >= 1)
+  if(recoMuons.size() >=2 && recoPhotons.size() >= 1)
   {
     return true;
   }

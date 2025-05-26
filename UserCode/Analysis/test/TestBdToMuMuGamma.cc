@@ -71,7 +71,6 @@
 #include "TMath.h"
 #include "TLorentzVector.h"
 #include "TMatrixD.h"
-#include "Math/ProbFunc.h"
 
 #include <sstream>
 #include <iomanip> 
@@ -84,14 +83,14 @@ using namespace std;
 
 
 //object definition
-class Test : public edm::one::EDAnalyzer<> {
+class TestBdToMuMuGamma : public edm::one::EDAnalyzer<> {
 public:
 
   //constructor, function is called when new object is created
-  explicit Test(const edm::ParameterSet& conf);
+  explicit TestBdToMuMuGamma(const edm::ParameterSet& conf);
 
   //destructor, function is called when object is destroyed
-  ~Test();
+  ~TestBdToMuMuGamma();
 
   //edm filter plugin specific functions
   virtual void beginJob();
@@ -153,17 +152,12 @@ private:
   TH1D* hPVRecoVsGenDistance;
   TH1D* hPVSVDistanceGen;
 
-  TH1D* hBsMassResidual;
-  TH1D* hXResidual;
-  TH1D* hZResidual;
-  TH1D* hChisquaredProb;
-
   int nConvPhotons = 0;
   std::vector<int> MuMuG = {22, 13, -13};
 };
 
 
-Test::Test(const edm::ParameterSet& conf)
+TestBdToMuMuGamma::TestBdToMuMuGamma(const edm::ParameterSet& conf)
   : theConfig(conf), theEventCount(0)
 {
   cout <<" CTORXX" << endl;
@@ -180,16 +174,16 @@ Test::Test(const edm::ParameterSet& conf)
   esGetTokens = make_unique<EcalClusterLazyToolsBase::ESGetTokens>(consumesCollector());
 
   theBeamSpotToken = consumes< reco::BeamSpot >( edm::InputTag("offlineBeamSpot"));
-  theVertexToken = consumes< vector<reco::Vertex>  >( edm::InputTag("offlinePrimaryVertices"));
+  theVertexToken = consumes< vector<reco::Vertex>  >( edm::InputTag("offlinePrimaryVerticesWithBS"));
 
 }
 
-Test::~Test()
+TestBdToMuMuGamma::~TestBdToMuMuGamma()
 {
   cout <<" DTOR" << endl;
 }
 
-bool Test::isSameDecay(const std::vector<int>& dec1, const std::vector<int>& dec2) {
+bool TestBdToMuMuGamma::isSameDecay(const std::vector<int>& dec1, const std::vector<int>& dec2) {
     
     if (dec1.size() != dec2.size()) {
         return false; 
@@ -202,7 +196,7 @@ bool Test::isSameDecay(const std::vector<int>& dec1, const std::vector<int>& dec
 }
 
 
-void Test::beginJob()
+void TestBdToMuMuGamma::beginJob()
 {
   //create a histogram
 
@@ -238,16 +232,10 @@ void Test::beginJob()
   hPVRecoVsGenDistance = new TH1D("hPVRecoVsGenDistance", "hPVRecoVsGenDistance", 100, 0, 0.1);
   hPVSVDistanceGen = new TH1D("hPVSVDistanceGen", "hPVSVDistanceGen", 100, 0, 0.5);
 
-  hBsMassResidual = new TH1D("hBsMassResidual", "hBsMassResidual", 100, -0.5, 0.5);
-  hXResidual = new TH1D("hXResidual", "hXResidual", 100, -0.1, 0.1);
-  hZResidual = new TH1D("hZResidual", "hZResidual", 100, -0.1, 0.1);
-  hChisquaredProb = new TH1D("hChisquaredProb", "hChisquaredProb", 100, 0, 1);
-  
-
-  cout << "HERE Test::beginJob()" << endl;
+  cout << "HERE TestBdToMuMuGamma::beginJob()" << endl;
 }
 
-void Test::endJob()
+void TestBdToMuMuGamma::endJob()
 {
   //make a new Root file
   TFile myRootFile( theConfig.getParameter<std::string>("outHist").c_str(), "RECREATE");
@@ -285,11 +273,6 @@ void Test::endJob()
 
   hPVRecoVsGenDistance->Write();
   hPVSVDistanceGen->Write();
-
-  hBsMassResidual->Write();
-  hXResidual->Write();
-  hZResidual->Write();
-  hChisquaredProb->Write();
   
   myRootFile.Close();
 
@@ -325,19 +308,14 @@ void Test::endJob()
   delete hPVRecoVsGenDistance;
   delete hPVSVDistanceGen;
 
-  delete hBsMassResidual;
-  delete hXResidual;
-  delete hZResidual;
-  delete hChisquaredProb;
-
-  cout << "HERE Test::endJob()" << endl;
+  cout << "HERE TestBdToMuMuGamma::endJob()" << endl;
 }
 
 
-void Test::analyze(
+void TestBdToMuMuGamma::analyze(
     const edm::Event& ev, const edm::EventSetup& es)
 {
-  std::cout << " -------------------------------- HERE Test::analyze "<< std::endl;
+  std::cout << " -------------------------------- HERE TestBdToMuMuGamma::analyze "<< std::endl;
 
   const std::vector<reco::GenParticle> & genPar = ev.get(theGenParticleToken);
   const std::vector<reco::Muon> & recoMuons = ev.get(theMuonToken);
@@ -348,17 +326,6 @@ void Test::analyze(
 
   const edm::TriggerResults & triggerResults = ev.get(theTriggerResultsToken);
   edm::TriggerNames triggerNames = ev.triggerNames(triggerResults);
-
-// check trigger
-// bool triggerFired = false;
-//   for (unsigned int i = 0; i < triggerResults.size(); i++)
-//   {
-//     TString name = triggerNames.triggerName(i);
-//     if(name == "HLT_DoubleMu4_3_LowMass_v1" && triggerResults.accept(i) == 0)
-//     {
-//       return;
-//     }
-//   }
 
 
   vector<const reco::Candidate*> genMuons;
@@ -388,7 +355,7 @@ void Test::analyze(
 
   for(const auto& genP : genPar)
   {
-    if (abs(genP.pdgId()) == 531)
+    if (abs(genP.pdgId()) == 511)
     {
       vector<int> daughters;
       for(unsigned int i=0; i < genP.numberOfDaughters(); i++)
@@ -416,8 +383,6 @@ void Test::analyze(
       }
     }
   }
-  // photon 10 GeV cut
-  // if (genPhotons.at(0)->pt() < 15) return;
 
 
   reco::Candidate::Point genPVPoint(genPV.x(), genPV.y(), genPV.z());
@@ -536,7 +501,7 @@ void Test::analyze(
 
     
     AlgebraicSymMatrix66 photonCov{ROOT::Math::SMatrixIdentity()};
-    AlgebraicVector6 diagonal(1e6, 1e6, 1e6, 1e6, 1e6, 1e6);
+    AlgebraicVector6 diagonal(1., 1., 1., 1., 1., 1.);
     photonCov.SetDiagonal(diagonal);
 
     CartesianTrajectoryError photonErr(photonCov);
@@ -655,7 +620,7 @@ void Test::analyze(
         vertexFitTree->movePointerToTheTop();
 
         // create the constraint
-        MultiTrackKinematicConstraint* multiPointingConstraint = new MultiTrackPointingKinematicConstraint(genPV);
+        MultiTrackKinematicConstraint* multiPointingConstraint = new MultiTrackPointingKinematicConstraint(pvGlobalPoint);
         KinematicConstrainedVertexFitter constrainedFitter;
         RefCountedKinematicTree vertexFitTreeGlobal = constrainedFitter.fit(allParticlesGlobal, multiPointingConstraint);
         if (!vertexFitTreeGlobal->isValid()) continue;
@@ -671,11 +636,6 @@ void Test::analyze(
 
         // invariant mass
         hBsMassGlobal->Fill(fitParticleGlobal->currentState().mass());
-
-        hBsMassResidual->Fill(fitParticleGlobal->currentState().mass() - 5.366);
-        hXResidual->Fill(fittedGlobalPointGlobal.x() - genSV.x());
-        hZResidual->Fill(fittedGlobalPointGlobal.z() - genSV.z());
-        hChisquaredProb->Fill(ROOT::Math::chisquared_cdf_c(fitVertexGlobal->chiSquared(), fitVertexGlobal->degreesOfFreedom()));
 
         // angle between the bs momentum and the line from the primary vertex to the secondary vertex
         GlobalVector PVToSVGlobal = fittedGlobalPointGlobal - pvGlobalPoint;
@@ -706,7 +666,7 @@ void Test::analyze(
 
         // pointing constraint sequential fit
         //
-        KinematicConstraint* pointingConstraint = new PointingKinematicConstraint(genPV);
+        KinematicConstraint* pointingConstraint = new PointingKinematicConstraint(pvGlobalPoint);
         KinematicParticleFitter kinematicFitter;
         vertexFitTree = kinematicFitter.fit(pointingConstraint, vertexFitTree);
         if (!vertexFitTree->isValid()) continue;
@@ -775,5 +735,5 @@ void Test::analyze(
   cout <<"*** Analyze event: " << ev.id() <<" analysed event count:" << ++theEventCount << endl;
 }
 
-DEFINE_FWK_MODULE(Test);
+DEFINE_FWK_MODULE(TestBdToMuMuGamma);
 

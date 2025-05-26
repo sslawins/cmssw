@@ -22,14 +22,13 @@ process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(False))
 
 files = []
 
-for f in glob.glob('/eos/cms/store/group/phys_bphys/privateMC_ForBsMMGAnalysis/TrackingVertexing/Private_BsToMuMuGamma_MCTunesRun3ECM13p6TeV/*/*/*/*.root'):
+for f in glob.glob('/eos/cms/store/group/phys_bphys/privateMC_ForBsMMGAnalysis/TrackingVertexing/Private_BsToJpsiGamma_MCTunesRun3ECM13p6TeV/*/*/*/*.root'):
     files.append('file:' + f)
 
 print('Number of files: ', len(files))
 
 # input files (up to 255 files accepted)
 
-# process.source = cms.Source('PoolSource', fileNames =cms.untracked.vstring("file:private_BsToMuMuGamma_Run3_102.root") )
 process.source = cms.Source('PoolSource', fileNames =cms.untracked.vstring(files) )
 process.source.skipEvents = cms.untracked.uint32(0)
 process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(2000000))
@@ -52,7 +51,7 @@ process.filter= cms.EDFilter("MyFilter")
 
 process.out = cms.OutputModule(
     "PoolOutputModule",
-    fileName = cms.untracked.string("condor_output/BsToMuMuGamma_filtered.root"),
+    fileName = cms.untracked.string("condor_output/BsJpsiGamma_filtered.root"),
     SelectEvents = cms.untracked.PSet(SelectEvents = cms.vstring('MyPath'))
 )
 process.MyPath = cms.Path(process.filter)
