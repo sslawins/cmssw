@@ -158,7 +158,13 @@ private:
   TH1D* hZResidual;
   TH1D* hChisquaredProb;
 
+  TH1D* hBsMassResidualGlobal;
+  TH1D* hXResidualGlobal;
+  TH1D* hZResidualGlobal;
+  TH1D* hChisquaredProbGlobal;
+
   int nConvPhotons = 0;
+  int nGenMatchedEvents = 0;
   std::vector<int> MuMuG = {22, 13, -13};
 };
 
@@ -239,9 +245,14 @@ void Test::beginJob()
   hPVSVDistanceGen = new TH1D("hPVSVDistanceGen", "hPVSVDistanceGen", 100, 0, 0.5);
 
   hBsMassResidual = new TH1D("hBsMassResidual", "hBsMassResidual", 100, -0.5, 0.5);
-  hXResidual = new TH1D("hXResidual", "hXResidual", 100, -0.1, 0.1);
-  hZResidual = new TH1D("hZResidual", "hZResidual", 100, -0.1, 0.1);
+  hXResidual = new TH1D("hXResidual", "hXResidual", 100, -0.05, 0.05);
+  hZResidual = new TH1D("hZResidual", "hZResidual", 100, -0.05, 0.05);
   hChisquaredProb = new TH1D("hChisquaredProb", "hChisquaredProb", 100, 0, 1);
+
+  hBsMassResidualGlobal = new TH1D("hBsMassResidualGlobal", "hBsMassResidualGlobal", 100, -0.5, 0.5);
+  hXResidualGlobal = new TH1D("hXResidualGlobal", "hXResidualGlobal", 100, -0.05, 0.05);
+  hZResidualGlobal = new TH1D("hZResidualGlobal", "hZResidualGlobal", 100, -0.05, 0.05);
+  hChisquaredProbGlobal = new TH1D("hChisquaredProbGlobal", "hChisquaredProbGlobal", 100, 0, 1);
   
 
   cout << "HERE Test::beginJob()" << endl;
@@ -290,6 +301,11 @@ void Test::endJob()
   hXResidual->Write();
   hZResidual->Write();
   hChisquaredProb->Write();
+
+  hBsMassResidualGlobal->Write();
+  hXResidualGlobal->Write();
+  hZResidualGlobal->Write();
+  hChisquaredProbGlobal->Write();
   
   myRootFile.Close();
 
@@ -329,6 +345,13 @@ void Test::endJob()
   delete hXResidual;
   delete hZResidual;
   delete hChisquaredProb;
+
+  delete hBsMassResidualGlobal;
+  delete hXResidualGlobal;
+  delete hZResidualGlobal;
+  delete hChisquaredProbGlobal;
+
+  cout << "genMatchedEvents: " << nGenMatchedEvents << endl;
 
   cout << "HERE Test::endJob()" << endl;
 }
@@ -416,8 +439,7 @@ void Test::analyze(
       }
     }
   }
-  // photon 10 GeV cut
-  // if (genPhotons.at(0)->pt() < 15) return;
+
 
 
   reco::Candidate::Point genPVPoint(genPV.x(), genPV.y(), genPV.z());
@@ -476,12 +498,19 @@ void Test::analyze(
     if (matched && minDR < 0.02)
     {
       reco::Photon* correctedPhoton = new reco::Photon(*bestMatchedPhoton);
+      GlobalPoint genPhotonVertex = genPh->vertex();
+
       correctedPhoton->setP4(genPh->p4());
       recoMatchedPhotons.push_back(bestMatchedPhoton);
       genMatchedPhotons.push_back(genPh);
       // hRecoVsGenGammaPt->Fill(genPh->pt(), bestMatchedPhoton->pt());
       // hGammaPtError->Fill((bestMatchedPhoton->pt() - genPh->pt())/genPh->pt());
     }
+  }
+
+  if(genMatchedMuons.size() == 2 && genMatchedPhotons.size() == 1 && recoMatchedPhotons.at(0)->isEB())
+  {
+    nGenMatchedEvents++;
   }
 
   if(recoMatchedPhotons.size() >0)
@@ -532,6 +561,15 @@ void Test::analyze(
 
     EcalClusterLazyTools lazyTools(ev, esGetTokens->get(es), ebRecHitsToken_, eeRecHitsToken_);
     TMatrixD cov(lazyTools.covariancesXYZ(*recoPho.superCluster()));
+    
+    // for(int i = 0; i < cov.GetNrows(); i++)
+    // {
+    //   for(int j = 0; j < cov.GetNcols(); j++)
+    //   {
+    //     if (i == j) cov(i, j) *= 1e-6; // scale the diagonal elements
+    //     else cov(i, j) = 0; // off-diagonal elements are set to zero
+    //   }
+    // }
     TMatrixD* covPtr(new TMatrixD(cov));
 
     
@@ -588,6 +626,12 @@ void Test::analyze(
         GlobalVector PVToSV = fittedGlobalPoint - pvGlobalPoint;
         GlobalVector BsMomentum = fitParticle->currentState().kinematicParameters().momentum();
         hCosSimBsVsSV->Fill(acos(BsMomentum.dot(PVToSV) / (BsMomentum.mag() * PVToSV.mag()))*180./3.14159);
+
+        hBsMassResidual->Fill(fitParticle->currentState().mass() - bs_mass);
+        hXResidual->Fill(fittedGlobalPoint.x() - genSV.x());
+        hZResidual->Fill(fittedGlobalPoint.z() - genSV.z());
+        hChisquaredProb->Fill(TMath::Prob(fitVertex->chiSquared(), fitVertex->degreesOfFreedom()));
+
 
         /////////////////////
         // try global fit
@@ -672,10 +716,10 @@ void Test::analyze(
         // invariant mass
         hBsMassGlobal->Fill(fitParticleGlobal->currentState().mass());
 
-        hBsMassResidual->Fill(fitParticleGlobal->currentState().mass() - 5.366);
-        hXResidual->Fill(fittedGlobalPointGlobal.x() - genSV.x());
-        hZResidual->Fill(fittedGlobalPointGlobal.z() - genSV.z());
-        hChisquaredProb->Fill(ROOT::Math::chisquared_cdf_c(fitVertexGlobal->chiSquared(), fitVertexGlobal->degreesOfFreedom()));
+        hBsMassResidualGlobal->Fill(fitParticleGlobal->currentState().mass() - 5.366);
+        hXResidualGlobal->Fill(fittedGlobalPointGlobal.x() - genSV.x());
+        hZResidualGlobal->Fill(fittedGlobalPointGlobal.z() - genSV.z());
+        hChisquaredProbGlobal->Fill(ROOT::Math::chisquared_cdf_c(fitVertexGlobal->chiSquared(), fitVertexGlobal->degreesOfFreedom()));
 
         // angle between the bs momentum and the line from the primary vertex to the secondary vertex
         GlobalVector PVToSVGlobal = fittedGlobalPointGlobal - pvGlobalPoint;
