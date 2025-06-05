@@ -163,6 +163,20 @@ private:
   TH1D* hZResidualGlobal;
   TH1D* hChisquaredProbGlobal;
 
+  TH1D* hEnergyPull;
+  TH1D* hEtaPull;
+  TH1D* hPhiPull;
+
+  TH1D* hEnergyResidual;
+  TH1D* hEtaResidual;
+  TH1D* hPhiResidual;
+
+  TH1D* hXPull;
+  TH1D* hYPull;
+  TH1D* hZPull;
+
+  TH1D* hCaloR;
+
   int nConvPhotons = 0;
   int nGenMatchedEvents = 0;
   std::vector<int> MuMuG = {22, 13, -13};
@@ -253,6 +267,21 @@ void Test::beginJob()
   hXResidualGlobal = new TH1D("hXResidualGlobal", "hXResidualGlobal", 100, -0.05, 0.05);
   hZResidualGlobal = new TH1D("hZResidualGlobal", "hZResidualGlobal", 100, -0.05, 0.05);
   hChisquaredProbGlobal = new TH1D("hChisquaredProbGlobal", "hChisquaredProbGlobal", 100, 0, 1);
+
+  hEnergyPull = new TH1D("hEnergyPull", "hEnergyPull", 100, -5, 5);
+  hEtaPull = new TH1D("hEtaPull", "hEtaPull", 100, -2, 2);
+  hPhiPull = new TH1D("hPhiPull", "hPhiPull", 100, -2, 2);
+
+  hEnergyResidual = new TH1D("hEnergyResidual", "hEnergyResidual", 100, -2, 2);
+  hEtaResidual = new TH1D("hEtaResidual", "hEtaResidual", 100, -2, 2);
+  hPhiResidual = new TH1D("hPhiResidual", "hPhiResidual", 100, -3.14, 3.14);
+
+  hXPull = new TH1D("hXPull", "hXPull", 100, -2, 2);
+  hYPull = new TH1D("hYPull", "hYPull", 100, -2, 2);
+  hZPull = new TH1D("hZPull", "hZPull", 100, -2, 2);
+
+
+  hCaloR = new TH1D("hCaloR", "hCaloR", 100, 0, 200);
   
 
   cout << "HERE Test::beginJob()" << endl;
@@ -306,6 +335,21 @@ void Test::endJob()
   hXResidualGlobal->Write();
   hZResidualGlobal->Write();
   hChisquaredProbGlobal->Write();
+
+  hEnergyPull->Write();
+  hEtaPull->Write();
+  hPhiPull->Write();
+
+  hEnergyResidual->Write();
+  hEtaResidual->Write();
+  hPhiResidual->Write();
+
+  hXPull->Write();
+  hYPull->Write();
+  hZPull->Write();
+
+
+  hCaloR->Write();
   
   myRootFile.Close();
 
@@ -350,6 +394,21 @@ void Test::endJob()
   delete hXResidualGlobal;
   delete hZResidualGlobal;
   delete hChisquaredProbGlobal;
+
+  delete hEnergyPull;
+  delete hEtaPull;
+  delete hPhiPull;
+
+  delete hEnergyResidual;
+  delete hEtaResidual;
+  delete hPhiResidual;
+
+  delete hXPull;
+  delete hYPull;
+  delete hZPull;
+
+
+  delete hCaloR;
 
   cout << "genMatchedEvents: " << nGenMatchedEvents << endl;
 
@@ -498,7 +557,10 @@ void Test::analyze(
     if (matched && minDR < 0.02)
     {
       reco::Photon* correctedPhoton = new reco::Photon(*bestMatchedPhoton);
-      GlobalPoint genPhotonVertex = genPh->vertex();
+      reco::Candidate::Point genPhotonVertex = genPh->vertex();
+      reco::Candidate::Vector genPhotonMomentum = genPh->momentum();
+      reco::Candidate::Point fakeCaloPosition = genPhotonVertex + genPhotonMomentum.unit() * 100;
+      correctedPhoton->setCaloPosition(math::XYZPointF(fakeCaloPosition.x(), fakeCaloPosition.y(), fakeCaloPosition.z()));
 
       correctedPhoton->setP4(genPh->p4());
       recoMatchedPhotons.push_back(bestMatchedPhoton);
@@ -572,6 +634,32 @@ void Test::analyze(
     // }
     TMatrixD* covPtr(new TMatrixD(cov));
 
+    // fill the pull histograms
+    hEnergyPull->Fill((recoPho.energy() - genMatchedPhotons[0]->energy()) / recoPho.getCorrectedEnergyError(reco::Photon::ecal_photons));
+    hEnergyResidual->Fill((recoPho.energy() - genMatchedPhotons[0]->energy()));
+    std::array<float, 3> covEtaPhi = lazyTools.covariances(*recoPho.superCluster());
+
+    reco::Candidate::Point genPhotonVertex = genMatchedPhotons[0]->vertex();
+    reco::Candidate::Vector genPhotonMomentum = genMatchedPhotons[0]->momentum();
+    reco::Candidate::Point genCaloPosition;
+
+    for(double l = 130; l < 500; l+=0.1)
+    {
+      genCaloPosition = genPhotonVertex + genPhotonMomentum.unit() * l;
+      if (genCaloPosition.rho() >= 136.5) break;
+    }
+
+    hEtaPull->Fill((recoPho.caloPosition().eta() - genCaloPosition.eta()) / sqrt(covEtaPhi[0]));
+    hPhiPull->Fill(reco::deltaPhi(recoPho.caloPosition().phi(), genCaloPosition.phi()) / sqrt(covEtaPhi[2]));
+
+    hEtaResidual->Fill(recoPho.caloPosition().eta() - genCaloPosition.eta());
+    hPhiResidual->Fill(reco::deltaPhi(recoPho.caloPosition().phi(), genCaloPosition.phi()));
+
+    hXPull->Fill((recoPho.caloPosition().x() - genCaloPosition.x()) / sqrt(cov(0, 0)));
+    hYPull->Fill((recoPho.caloPosition().y() - genCaloPosition.y()) / sqrt(cov(1, 1)));
+    hZPull->Fill((recoPho.caloPosition().z() - genCaloPosition.z()) / sqrt(cov(2, 2)));
+
+    hCaloR->Fill(recoPho.caloPosition().rho());
     
     AlgebraicSymMatrix66 photonCov{ROOT::Math::SMatrixIdentity()};
     AlgebraicVector6 diagonal(1e6, 1e6, 1e6, 1e6, 1e6, 1e6);
