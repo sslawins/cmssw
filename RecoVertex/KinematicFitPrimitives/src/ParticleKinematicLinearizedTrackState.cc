@@ -46,9 +46,6 @@ AlgebraicVector6 ParticleKinematicLinearizedTrackState::predictedStateParameters
     z(1) = mz;
     z(2) = mE;
     z(3) = mass;
-    // std::cout << "Photon predicted state parameters:" << std::endl;
-    // z.Print(std::cout);
-    // std::cout << std::endl;
     return z;
   }
   else
@@ -76,35 +73,19 @@ AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateWeight
 
     originalError(3, 3) = ECov * ECov;
 
-    // std::cout << "Photon original error matrix:" << std::endl;
-    // originalError.Print(std::cout);
-    // std::cout << std::endl;
-
     AlgebraicMatrix64 jacobian;
     jacobian(0, 1) = 1;
     jacobian(1, 2) = 1;
     jacobian(2, 3) = 1;
-
-    // std::cout << "Photon jacobian matrix:" << std::endl;
-    // jacobian.Print(std::cout);
-    // std::cout << std::endl;
 
     AlgebraicSymMatrix66 errorMatrix = ROOT::Math::Similarity(jacobian, originalError);
     errorMatrix(3, 3) = 1e-5;
     errorMatrix(4, 4) = 1e-5;
     errorMatrix(5, 5) = 1e-5;
 
-    // std::cout << "Photon error matrix after transformation:" << std::endl;
-    // errorMatrix.Print(std::cout);
-    // std::cout << std::endl;
-
     int i = 0;
     AlgebraicSymMatrix66 z = errorMatrix.Inverse(i);
     error = i;
-
-    // std::cout << "Photon weight matrix:" << std::endl;
-    // z.Print(std::cout);
-    // std::cout << std::endl;
     
     return z;
   }
@@ -146,8 +127,7 @@ AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateError(
     errorMatrix(3, 3) = 1e-5;
     errorMatrix(4, 4) = 1e-5;
     errorMatrix(5, 5) = 1e-5;
-    // std::cout << "Photon error matrix:" << std::endl;
-    // errorMatrix.Print(std::cout);
+
     return errorMatrix;
   }
 
@@ -552,20 +532,6 @@ void ParticleKinematicLinearizedTrackState::computePhotonJacobians() const {
 
   theConstantTerm = AlgebraicVector6(theExpandedParams - thePositionJacobian * expansionPoint -
                                       theMomentumJacobian * momentumAtExpansionPoint);
-
-  // std::cout << "Photon Jacobians:" << std::endl;
-  // std::cout << "Position Jacobian:" << std::endl;
-  // thePositionJacobian.Print(std::cout);
-  // std::cout << std::endl;
-  // std::cout << "Momentum Jacobian:" << std::endl;
-  // theMomentumJacobian.Print(std::cout);
-  // std::cout << std::endl;
-  // std::cout << "Constant Term:" << std::endl;
-  // theConstantTerm.Print(std::cout);
-  // std::cout << std::endl;
-  // std::cout << "Expanded Parameters:" << std::endl;
-  // theExpandedParams.Print(std::cout);
-  // std::cout << std::endl;
 
 }
 
