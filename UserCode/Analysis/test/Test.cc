@@ -150,6 +150,10 @@ private:
   TH1D* hPhotonPtResReco;
   TH1D* hPhotonPtResFit;
 
+  TH1D* hPhotonEnergyResReco;
+  TH1D* hPhotonEnergyResFit;
+  TH1D* hPhotonEnergyRecoVsFit;
+
   TH1D* hPVRecoVsGenDistance;
   TH1D* hPVSVDistanceGen;
 
@@ -174,6 +178,10 @@ private:
   TH1D* hXPull;
   TH1D* hYPull;
   TH1D* hZPull;
+
+  TH1D* hCaloXResidual;
+  TH1D* hCaloYResidual;
+  TH1D* hCaloZResidual;
 
   TH1D* hCaloR;
 
@@ -255,6 +263,10 @@ void Test::beginJob()
   hPhotonPtResReco = new TH1D("hPhotonPtResReco", "hPhotonPtResReco", 100, -0.5, 0.5);
   hPhotonPtResFit = new TH1D("hPhotonPtResFit", "hPhotonPtResFit", 100, -0.5, 0.5);
 
+  hPhotonEnergyResReco = new TH1D("hPhotonEnergyResReco", "hPhotonEnergyResReco", 100, -0.5, 0.5);
+  hPhotonEnergyResFit = new TH1D("hPhotonEnergyResFit", "hPhotonEnergyResFit", 100, -0.5, 0.5);
+  hPhotonEnergyRecoVsFit = new TH1D("hPhotonEnergyRecoVsFit", "hPhotonEnergyRecoVsFit", 100, -0.5, 0.5);
+
   hPVRecoVsGenDistance = new TH1D("hPVRecoVsGenDistance", "hPVRecoVsGenDistance", 100, 0, 0.1);
   hPVSVDistanceGen = new TH1D("hPVSVDistanceGen", "hPVSVDistanceGen", 100, 0, 0.5);
 
@@ -279,6 +291,11 @@ void Test::beginJob()
   hXPull = new TH1D("hXPull", "hXPull", 100, -2, 2);
   hYPull = new TH1D("hYPull", "hYPull", 100, -2, 2);
   hZPull = new TH1D("hZPull", "hZPull", 100, -2, 2);
+
+  hCaloXResidual = new TH1D("hCaloXResidual", "hCaloXResidual; [cm]", 100, -5, 5);
+  hCaloYResidual = new TH1D("hCaloYResidual", "hCaloYResidual; [cm]", 100, -5, 5);
+  hCaloZResidual = new TH1D("hCaloZResidual", "hCaloZResidual; [cm]", 100, -5, 5);
+
 
 
   hCaloR = new TH1D("hCaloR", "hCaloR", 100, 0, 200);
@@ -323,6 +340,10 @@ void Test::endJob()
   hPhotonPtResReco->Write();
   hPhotonPtResFit->Write();
 
+  hPhotonEnergyResReco->Write();
+  hPhotonEnergyResFit->Write();
+  hPhotonEnergyRecoVsFit->Write();
+
   hPVRecoVsGenDistance->Write();
   hPVSVDistanceGen->Write();
 
@@ -347,6 +368,10 @@ void Test::endJob()
   hXPull->Write();
   hYPull->Write();
   hZPull->Write();
+
+  hCaloXResidual->Write();
+  hCaloYResidual->Write();
+  hCaloZResidual->Write();
 
 
   hCaloR->Write();
@@ -382,6 +407,10 @@ void Test::endJob()
   delete hPhotonPtResReco;
   delete hPhotonPtResFit;
 
+  delete hPhotonEnergyResReco;
+  delete hPhotonEnergyResFit;
+  delete hPhotonEnergyRecoVsFit;
+
   delete hPVRecoVsGenDistance;
   delete hPVSVDistanceGen;
 
@@ -406,6 +435,10 @@ void Test::endJob()
   delete hXPull;
   delete hYPull;
   delete hZPull;
+
+  delete hCaloXResidual;
+  delete hCaloYResidual;
+  delete hCaloZResidual;
 
 
   delete hCaloR;
@@ -561,16 +594,22 @@ void Test::analyze(
       reco::Candidate::Vector genPhotonMomentum = genPh->momentum();
       reco::Candidate::Point fakeCaloPosition = genPhotonVertex + genPhotonMomentum.unit() * 100;
       correctedPhoton->setCaloPosition(math::XYZPointF(fakeCaloPosition.x(), fakeCaloPosition.y(), fakeCaloPosition.z()));
-
       correctedPhoton->setP4(genPh->p4());
-      recoMatchedPhotons.push_back(bestMatchedPhoton);
+
+      double photonEnergy = bestMatchedPhoton->energy();
+      double correctedEnergy = (photonEnergy - 0.599366) / 1.02408;
+      double scalingFactor = correctedEnergy / photonEnergy;
+      reco::Photon* energyCorrectedPhoton = new reco::Photon(*bestMatchedPhoton);
+      energyCorrectedPhoton->setP4(energyCorrectedPhoton->p4() * scalingFactor);
+
+      recoMatchedPhotons.push_back(energyCorrectedPhoton);
       genMatchedPhotons.push_back(genPh);
       // hRecoVsGenGammaPt->Fill(genPh->pt(), bestMatchedPhoton->pt());
       // hGammaPtError->Fill((bestMatchedPhoton->pt() - genPh->pt())/genPh->pt());
     }
   }
 
-  if(genMatchedMuons.size() == 2 && genMatchedPhotons.size() == 1 && recoMatchedPhotons.at(0)->isEB())
+  if(genMatchedMuons.size() == 2 && genMatchedPhotons.size() == 1)
   {
     nGenMatchedEvents++;
   }
@@ -658,6 +697,10 @@ void Test::analyze(
     hXPull->Fill((recoPho.caloPosition().x() - genCaloPosition.x()) / sqrt(cov(0, 0)));
     hYPull->Fill((recoPho.caloPosition().y() - genCaloPosition.y()) / sqrt(cov(1, 1)));
     hZPull->Fill((recoPho.caloPosition().z() - genCaloPosition.z()) / sqrt(cov(2, 2)));
+
+    hCaloXResidual->Fill(recoPho.caloPosition().x() - genCaloPosition.x());
+    hCaloYResidual->Fill(recoPho.caloPosition().y() - genCaloPosition.y());
+    hCaloZResidual->Fill(recoPho.caloPosition().z() - genCaloPosition.z());
 
     hCaloR->Fill(recoPho.caloPosition().rho());
     
@@ -787,7 +830,7 @@ void Test::analyze(
         vertexFitTree->movePointerToTheTop();
 
         // create the constraint
-        MultiTrackKinematicConstraint* multiPointingConstraint = new MultiTrackPointingKinematicConstraint(genPV);
+        MultiTrackKinematicConstraint* multiPointingConstraint = new MultiTrackPointingKinematicConstraint(pvGlobalPoint);
         KinematicConstrainedVertexFitter constrainedFitter;
         RefCountedKinematicTree vertexFitTreeGlobal = constrainedFitter.fit(allParticlesGlobal, multiPointingConstraint);
         if (!vertexFitTreeGlobal->isValid()) continue;
@@ -822,6 +865,8 @@ void Test::analyze(
         hMuonPtResReco->Fill((genMatchedMuons[j]->pt() - recoMatchedMuons[j]->pt())/genMatchedMuons[j]->pt());
         hPhotonPtResReco->Fill((genMatchedPhotons[k]->pt() - recoMatchedPhotons[k]->pt())/genMatchedPhotons[k]->pt());
 
+        hPhotonEnergyResReco->Fill((genMatchedPhotons[k]->energy() - recoMatchedPhotons[k]->energy())/genMatchedPhotons[k]->energy());
+
         vertexFitTreeGlobal->movePointerToTheFirstChild();
         RefCountedKinematicParticle fittedMu1 = vertexFitTreeGlobal->currentParticle();
         hMuonPtResFit->Fill((genMatchedMuons[i]->pt() - fittedMu1->currentState().kinematicParameters().momentum().perp())/genMatchedMuons[i]->pt());
@@ -831,6 +876,8 @@ void Test::analyze(
         vertexFitTreeGlobal->movePointerToTheNextChild();
         RefCountedKinematicParticle fittedPho = vertexFitTreeGlobal->currentParticle();
         hPhotonPtResFit->Fill((genMatchedPhotons[k]->pt() - fittedPho->currentState().kinematicParameters().momentum().perp())/genMatchedPhotons[k]->pt());
+        hPhotonEnergyResFit->Fill((genMatchedPhotons[k]->energy() - fittedPho->currentState().kinematicParameters().energy())/genMatchedPhotons[k]->energy());
+        hPhotonEnergyRecoVsFit->Fill(recoMatchedPhotons[k]->energy() - fittedPho->currentState().kinematicParameters().energy());
 
         //// end of global fit
         ////

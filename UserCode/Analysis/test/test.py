@@ -45,10 +45,10 @@ print('Number of files: ', len(files))
 
 # input files (up to 255 files accepted)
 
-process.source = cms.Source('PoolSource', fileNames =cms.untracked.vstring("file:data_filtered/BsToMuMuGamma_filtered.root") )
+process.source = cms.Source('PoolSource', fileNames =cms.untracked.vstring("file:condor_output/BsToMuMuGamma_filtered.root") )
 # process.source = cms.Source('PoolSource', fileNames =cms.untracked.vstring(files) )
 process.source.skipEvents = cms.untracked.uint32(0)
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(10000))
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1))
 
 process.load("TrackingTools/TransientTrack/TransientTrackBuilder_cfi")
 
@@ -60,7 +60,8 @@ process.load('Configuration.StandardSequences.EndOfProcess_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 from Configuration.AlCa.GlobalTag import GlobalTag
 # process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:run3_data', '')
-process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:run3_mc_FULL','')
+# process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:run3_mc_FULL','')
+process.GlobalTag = GlobalTag(process.GlobalTag, '124X_mcRun3_2022_realistic_v12','')
 
 
 process.analiza= cms.EDAnalyzer("Test",
