@@ -185,6 +185,9 @@ private:
 
   TH1D* hCaloR;
 
+  TH1D* hDimuonVertexVsMMGVertexDistance;
+  TH1D* hDimuonDistance;
+
   int nConvPhotons = 0;
   int nGenMatchedEvents = 0;
   std::vector<int> MuMuG = {22, 13, -13};
@@ -297,9 +300,10 @@ void Test::beginJob()
   hCaloZResidual = new TH1D("hCaloZResidual", "hCaloZResidual; [cm]", 100, -5, 5);
 
 
-
   hCaloR = new TH1D("hCaloR", "hCaloR", 100, 0, 200);
-  
+
+  hDimuonVertexVsMMGVertexDistance = new TH1D("hDimuonVertexVsMMGVertexDistance", "hDimuonVertexVsMMGVertexDistance; [cm]", 100, 0, 0.1);
+  hDimuonDistance = new TH1D("hDimuonDistance", "hDimuonDistance; [cm]", 100, 0, 0.1);
 
   cout << "HERE Test::beginJob()" << endl;
 }
@@ -375,6 +379,9 @@ void Test::endJob()
 
 
   hCaloR->Write();
+
+  hDimuonVertexVsMMGVertexDistance->Write();
+  hDimuonDistance->Write();
   
   myRootFile.Close();
 
@@ -442,6 +449,9 @@ void Test::endJob()
 
 
   delete hCaloR;
+
+  delete hDimuonVertexVsMMGVertexDistance;
+  delete hDimuonDistance;
 
   cout << "genMatchedEvents: " << nGenMatchedEvents << endl;
 
@@ -602,7 +612,7 @@ void Test::analyze(
       reco::Photon* energyCorrectedPhoton = new reco::Photon(*bestMatchedPhoton);
       energyCorrectedPhoton->setP4(energyCorrectedPhoton->p4() * scalingFactor);
 
-      recoMatchedPhotons.push_back(energyCorrectedPhoton);
+      recoMatchedPhotons.push_back(bestMatchedPhoton);
       genMatchedPhotons.push_back(genPh);
       // hRecoVsGenGammaPt->Fill(genPh->pt(), bestMatchedPhoton->pt());
       // hGammaPtError->Fill((bestMatchedPhoton->pt() - genPh->pt())/genPh->pt());
@@ -611,7 +621,7 @@ void Test::analyze(
 
   if(genMatchedMuons.size() == 2 && genMatchedPhotons.size() == 1)
   {
-    nGenMatchedEvents++;
+    if(recoMatchedPhotons[0]->isEB()) nGenMatchedEvents++;
   }
 
   if(recoMatchedPhotons.size() >0)
@@ -830,7 +840,7 @@ void Test::analyze(
         vertexFitTree->movePointerToTheTop();
 
         // create the constraint
-        MultiTrackKinematicConstraint* multiPointingConstraint = new MultiTrackPointingKinematicConstraint(pvGlobalPoint);
+        MultiTrackKinematicConstraint* multiPointingConstraint = new MultiTrackPointingKinematicConstraint(genPV);
         KinematicConstrainedVertexFitter constrainedFitter;
         RefCountedKinematicTree vertexFitTreeGlobal = constrainedFitter.fit(allParticlesGlobal, multiPointingConstraint);
         if (!vertexFitTreeGlobal->isValid()) continue;
@@ -879,6 +889,7 @@ void Test::analyze(
         hPhotonEnergyResFit->Fill((genMatchedPhotons[k]->energy() - fittedPho->currentState().kinematicParameters().energy())/genMatchedPhotons[k]->energy());
         hPhotonEnergyRecoVsFit->Fill(recoMatchedPhotons[k]->energy() - fittedPho->currentState().kinematicParameters().energy());
 
+
         //// end of global fit
         ////
         ////
@@ -921,6 +932,9 @@ void Test::analyze(
         reco::Candidate::Point muonFittedPoint(muonFittedGlobalPoint.x(), muonFittedGlobalPoint.y(), muonFittedGlobalPoint.z());
         reco::Candidate::Point muonGenPoint(genMuons[0]->vertex().x(), genMuons[0]->vertex().y(), genMuons[0]->vertex().z());
         //
+
+        hDimuonVertexVsMMGVertexDistance->Fill((muonFittedPoint - fittedPointGlobal).R());
+        hDimuonDistance->Fill((muonFittedPoint - genPoint).R());
 
 
         h2vs3Distance->Fill((muonFittedPoint - fittedPoint).R());
