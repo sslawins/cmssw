@@ -32,65 +32,35 @@ AlgebraicVector6 ParticleKinematicLinearizedTrackState::predictedStateParameters
   if (!jacobiansAvailable)
     computeJacobians();
 
-  // this is the measurement
-  if (part->getPhoton() != nullptr)
-  {
+  // photon: the measurement is the cluster position (two coordinates, the pivot
+  // one is eliminated), the cluster energy and the mass hypothesis
+  if (part->getPhoton() != nullptr) {
+    int ci, cj;
+    photonMeasuredIndices(ci, cj);
+    const auto& pos = part->getPhoton()->caloPosition();
+    const double m[3] = {pos.x(), pos.y(), pos.z()};
+
     AlgebraicVector6 z;
-    double my = part->getPhoton()->caloPosition().y();
-    double mz = part->getPhoton()->caloPosition().z();
-    double mE = part->getPhoton()->energy();
-    double mass = part->currentState().mass();
-
-
-    z(0) = my;
-    z(1) = mz;
-    z(2) = mE;
-    z(3) = mass;
+    z(0) = m[ci];
+    z(1) = m[cj];
+    z(2) = part->getPhoton()->energy();
+    z(3) = part->currentState().mass();
     return z;
   }
-  else
-    return thePredState.perigeeParameters().vector();
+  return thePredState.perigeeParameters().vector();
 }
 
 AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateWeight(int& error) const {
   if (!jacobiansAvailable)
     computeJacobians();
 
-  if (part->getPhoton() != nullptr)
-  {
-    AlgebraicSymMatrix44 originalError;
-
-    TMatrixD posCov = *(part->getPhotonCov());
-    float ECov = part->getPhoton()->getCorrectedEnergyError(reco::Photon::ecal_photons);
-
-    for (int i = 0; i < 3; i++)
-    {
-      for (int j = 0; j < 3; j++)
-      {
-        originalError(i, j) = posCov(i, j);
-      }
-    }
-
-    originalError(3, 3) = ECov * ECov;
-
-    AlgebraicMatrix64 jacobian;
-    jacobian(0, 1) = 1;
-    jacobian(1, 2) = 1;
-    jacobian(2, 3) = 1;
-
-    AlgebraicSymMatrix66 errorMatrix = ROOT::Math::Similarity(jacobian, originalError);
-    errorMatrix(3, 3) = 1e-5;
-    errorMatrix(4, 4) = 1e-5;
-    errorMatrix(5, 5) = 1e-5;
-
+  if (part->getPhoton() != nullptr) {
     int i = 0;
-    AlgebraicSymMatrix66 z = errorMatrix.Inverse(i);
+    AlgebraicSymMatrix66 z = thePhotonMeasurementError.Inverse(i);
     error = i;
-    
     return z;
   }
 
-  
   int i = 0;
   AlgebraicSymMatrix66 z = thePredState.perigeeError().weightMatrix(i);
   error = i;
@@ -100,37 +70,10 @@ AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateWeight
 
 AlgebraicSymMatrix66 ParticleKinematicLinearizedTrackState::predictedStateError() const {
   if (!jacobiansAvailable)
-  computeJacobians();
-  
+    computeJacobians();
+
   if (part->getPhoton() != nullptr)
-  {
-    AlgebraicSymMatrix44 originalError;
-    TMatrixD posCov = *(part->getPhotonCov());
-    float ECov = part->getPhoton()->superCluster()->correctedEnergyUncertainty();
-
-    for (int i = 0; i < 3; i++)
-    {
-      for (int j = 0; j < 3; j++)
-      {
-        originalError(i, j) = posCov(i, j);
-      }
-    }
-
-    originalError(3, 3) = ECov * ECov;
-
-    AlgebraicMatrix64 jacobian;
-    jacobian(0, 1) = 1;
-    jacobian(1, 2) = 1;
-    jacobian(2, 3) = 1;
-
-    AlgebraicSymMatrix66 errorMatrix = ROOT::Math::Similarity(jacobian, originalError);
-    errorMatrix(3, 3) = 1e-5;
-    errorMatrix(4, 4) = 1e-5;
-    errorMatrix(5, 5) = 1e-5;
-
-    return errorMatrix;
-  }
-
+    return thePhotonMeasurementError;
 
   return thePredState.perigeeError().covarianceMatrix();
 }
@@ -193,55 +136,23 @@ ParticleKinematicLinearizedTrackState::RefCountedRefittedTrackState
 ParticleKinematicLinearizedTrackState::createRefittedTrackState(const GlobalPoint& vertexPosition,
                                                                 const AlgebraicVector4& vectorParameters,
                                                                 const AlgebraicSymMatrix77& covarianceMatrix) const {
-  if(part->getPhoton() != nullptr)
-  {
-    AlgebraicVector7 par;
-    par(0) = vertexPosition.x();
-    par(1) = vertexPosition.y();
-    par(2) = vertexPosition.z();
-    par(3) = vectorParameters(0);
-    par(4) = vectorParameters(1);
-    par(5) = vectorParameters(2);
-    par(6) = vectorParameters(3);
-    KinematicParameters kPar(par);
-    KinematicParametersError kParErr(covarianceMatrix);
-
-    KinematicState lst = KinematicState(kPar, kParErr, part->currentState().particleCharge(), part->currentState().magneticField());
-    RefCountedRefittedTrackState rst = RefCountedRefittedTrackState(new KinematicRefittedTrackState(lst, vectorParameters));
-    return rst;
-  }
-  else
-  {
-    KinematicPerigeeConversions conversions;
-    KinematicState lst = conversions.kinematicState(
-        vectorParameters, vertexPosition, charge(), covarianceMatrix, part->currentState().magneticField());
-    RefCountedRefittedTrackState rst =
-        RefCountedRefittedTrackState(new KinematicRefittedTrackState(lst, vectorParameters));
-    return rst;
-  }
+  KinematicPerigeeConversions conversions;
+  KinematicState lst = conversions.kinematicState(
+      vectorParameters, vertexPosition, charge(), covarianceMatrix, part->currentState().magneticField());
+  RefCountedRefittedTrackState rst =
+      RefCountedRefittedTrackState(new KinematicRefittedTrackState(lst, vectorParameters));
+  return rst;
 }
 
 AlgebraicVector4 ParticleKinematicLinearizedTrackState::predictedStateMomentumParameters() const {
   if (!jacobiansAvailable)
     computeJacobians();
-  if (part->getPhoton() != nullptr)
-  {
-    AlgebraicVector4 res;
-    res[0] = thePredState.theState().globalMomentum().x();
-    res[1] = thePredState.theState().globalMomentum().y();
-    res[2] = thePredState.theState().globalMomentum().z();
-    res[3] = thePredState.theState().mass();
-    return res;
-  }
-  else
-  {
-    AlgebraicVector4 res;
-    res[0] = thePredState.perigeeParameters().vector()(0);
-    res[1] = thePredState.perigeeParameters().vector()(1);
-    res[2] = thePredState.perigeeParameters().vector()(2);
-    res[3] = thePredState.perigeeParameters().vector()(5);
-    return res;
-  }
+  AlgebraicVector4 res;
+  res[0] = thePredState.perigeeParameters().vector()(0);
+  res[1] = thePredState.perigeeParameters().vector()(1);
+  res[2] = thePredState.perigeeParameters().vector()(2);
+  res[3] = thePredState.perigeeParameters().vector()(5);
+  return res;
 }
 
 AlgebraicSymMatrix44 ParticleKinematicLinearizedTrackState::predictedStateMomentumError() const {
@@ -270,40 +181,24 @@ std::vector<ReferenceCountingPointer<LinearizedTrackState<6> > > ParticleKinemat
 
 AlgebraicVector6 ParticleKinematicLinearizedTrackState::refittedParamFromEquation(
     const RefCountedRefittedTrackState& theRefittedState) const {
-  if (part->getPhoton() != nullptr)
-  {
-    AlgebraicVectorM momentum = theRefittedState->momentumVector();
-    AlgebraicVector3 vertexPosition;
-    vertexPosition(0) = theRefittedState->position().x();
-    vertexPosition(1) = theRefittedState->position().y();
-    vertexPosition(2) = theRefittedState->position().z();
-    AlgebraicVector6 param = constantTerm() + positionJacobian() * vertexPosition + momentumJacobian() * momentum;
-
-    return param;
+  AlgebraicVectorM momentum = theRefittedState->momentumVector();
+  if ((momentum(2) * predictedStateMomentumParameters()(2) < 0) && (std::fabs(momentum(2)) > M_PI / 2)) {
+    if (predictedStateMomentumParameters()(2) < 0.)
+      momentum(2) -= 2 * M_PI;
+    if (predictedStateMomentumParameters()(2) > 0.)
+      momentum(2) += 2 * M_PI;
   }
-  else
-  {
-    AlgebraicVectorM momentum = theRefittedState->momentumVector();
-    if ((momentum(2) * predictedStateMomentumParameters()(2) < 0) && (std::fabs(momentum(2)) > M_PI / 2)) {
-      if (predictedStateMomentumParameters()(2) < 0.)
-        momentum(2) -= 2 * M_PI;
-      if (predictedStateMomentumParameters()(2) > 0.)
-        momentum(2) += 2 * M_PI;
-    }
 
-    AlgebraicVector3 vertexPosition;
-    vertexPosition(0) = theRefittedState->position().x();
-    vertexPosition(1) = theRefittedState->position().y();
-    vertexPosition(2) = theRefittedState->position().z();
-    AlgebraicVector6 param = constantTerm() + positionJacobian() * vertexPosition + momentumJacobian() * momentum;
+  AlgebraicVector3 vertexPosition;
+  vertexPosition(0) = theRefittedState->position().x();
+  vertexPosition(1) = theRefittedState->position().y();
+  vertexPosition(2) = theRefittedState->position().z();
+  AlgebraicVector6 param = constantTerm() + positionJacobian() * vertexPosition + momentumJacobian() * momentum;
 
-    if (param(2) > M_PI)
-      param(2) -= 2 * M_PI;
-    if (param(2) < -M_PI)
-      param(2) += 2 * M_PI;
+  // for photons param(2) is the energy, not an angle
+  checkParameters(param);
 
-    return param;
-  }
+  return param;
 }
 
 void ParticleKinematicLinearizedTrackState::checkParameters(AlgebraicVector6& parameters) const {
@@ -478,63 +373,125 @@ void ParticleKinematicLinearizedTrackState::computeNeutralJacobians() const {
                                      theMomentumJacobian * momentumAtExpansionPoint);
 }
 
-void ParticleKinematicLinearizedTrackState::computePhotonJacobians() const {
-  double vx = thePredState.theState().globalPosition().x();
-  double vy = thePredState.theState().globalPosition().y();
-  double vz = thePredState.theState().globalPosition().z();
-
-  double px = thePredState.theState().globalMomentum().x();
-  double py = thePredState.theState().globalMomentum().y();
-  double pz = thePredState.theState().globalMomentum().z();
-
-  double mass = part->currentState().mass();
-
-  double mx = part->getPhoton()->caloPosition().x();
-  double my = part->getPhoton()->caloPosition().y();
-  double mz = part->getPhoton()->caloPosition().z();
-  double mE = part->getPhoton()->energy();
-
-  double p = sqrt(px * px + py * py + pz * pz);
-
-  thePositionJacobian(0, 0) = -py/px;
-  thePositionJacobian(0, 1) = 1;
-  thePositionJacobian(1, 0) = -pz/px;
-  thePositionJacobian(1, 2) = 1;
-
-  theMomentumJacobian(0, 0) = -(mx-vx)*py/(px*px);
-  theMomentumJacobian(0, 1) = (mx-vx)/px;
-  theMomentumJacobian(1, 0) = -(mx-vx)*pz/(px*px);
-  theMomentumJacobian(1, 2) = (mx-vx)/px;
-  theMomentumJacobian(2, 0) = px/p;
-  theMomentumJacobian(2, 1) = py/p;
-  theMomentumJacobian(2, 2) = pz/p;
-  theMomentumJacobian(3, 3) = 1;
-
-
-  // The measurement function h at the expansion point
-  theExpandedParams[0] = vy + (mx-vx)*py/px;
-  theExpandedParams[1] = vz + (mx-vx)*pz/px;
-  theExpandedParams[2] = p;
-  theExpandedParams[3] = mass;
-  theExpandedParams[4] = 0;
-  theExpandedParams[5] = 0;
-
-
-  AlgebraicVector3 expansionPoint;
-  expansionPoint[0] = vx;
-  expansionPoint[1] = vy;
-  expansionPoint[2] = vz;
-  AlgebraicVector4 momentumAtExpansionPoint;
-  momentumAtExpansionPoint[0] = px;
-  momentumAtExpansionPoint[1] = py;
-  momentumAtExpansionPoint[2] = pz;
-  momentumAtExpansionPoint[3] = mass;
-
-  theConstantTerm = AlgebraicVector6(theExpandedParams - thePositionJacobian * expansionPoint -
-                                      theMomentumJacobian * momentumAtExpansionPoint);
-
+void ParticleKinematicLinearizedTrackState::photonMeasuredIndices(int& i, int& j) const {
+  i = (thePhotonPivot == 0) ? 1 : 0;
+  j = (thePhotonPivot == 2) ? 1 : 2;
 }
 
+// Photon measurement model, following BaBar (physics/0503191, Eqs. 38-40) and
+// Belle II (NIM A 976 (2020) 164269, Eqs. 19-21): the photon flies on a straight
+// line from the vertex v to the cluster m, m = v + tau * p. The flight length tau
+// is eliminated with the coordinate k of the largest momentum component (pivot):
+//   h_i = v_i + (m_k - v_k) * p_i / p_k
+//   h_j = v_j + (m_k - v_k) * p_j / p_k
+//   h_E = sqrt(p^2 + m^2)
+//   h_m = m
+// The momentum is parametrised as for neutral particles, q = (rho = 1/pt, theta, phi, m),
+// so that the refitted states and FinalTreeBuilder can treat the photon like any other track.
+// Rows 4 and 5 are unused (zero Jacobians, tiny variance).
+void ParticleKinematicLinearizedTrackState::computePhotonJacobians() const {
+  const GlobalPoint vtx = thePredState.theState().globalPosition();
+  const GlobalVector mom = thePredState.theState().globalMomentum();
+  const double v[3] = {vtx.x(), vtx.y(), vtx.z()};
+  const double p[3] = {mom.x(), mom.y(), mom.z()};
+  const double mass = part->currentState().mass();
+
+  const auto& pos = part->getPhoton()->caloPosition();
+  const double m[3] = {pos.x(), pos.y(), pos.z()};
+
+  // pivot: largest momentum component, so that p_i/p_k and p_j/p_k stay bounded
+  thePhotonPivot = 0;
+  for (int c = 1; c < 3; ++c) {
+    if (std::abs(p[c]) > std::abs(p[thePhotonPivot]))
+      thePhotonPivot = c;
+  }
+  const int k = thePhotonPivot;
+  int i, j;
+  photonMeasuredIndices(i, j);
+
+  const double ri = p[i] / p[k];
+  const double rj = p[j] / p[k];
+  const double d = m[k] - v[k];
+  const double energy = sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2] + mass * mass);
+
+  // The measurement function at the expansion point
+  theExpandedParams = AlgebraicVector6();
+  theExpandedParams[0] = v[i] + d * ri;
+  theExpandedParams[1] = v[j] + d * rj;
+  theExpandedParams[2] = energy;
+  theExpandedParams[3] = mass;
+
+  // [row, column]: rows = (h_i, h_j, h_E, h_m), columns = (x_v, y_v, z_v)
+  thePositionJacobian = AlgebraicMatrix63();
+  thePositionJacobian(0, i) = 1;
+  thePositionJacobian(0, k) = -ri;
+  thePositionJacobian(1, j) = 1;
+  thePositionJacobian(1, k) = -rj;
+
+  // derivatives with respect to the cartesian momentum (px, py, pz, m)
+  AlgebraicMatrix44 cartesianJacobian;
+  cartesianJacobian(0, i) = d / p[k];
+  cartesianJacobian(0, k) = -d * ri / p[k];
+  cartesianJacobian(1, j) = d / p[k];
+  cartesianJacobian(1, k) = -d * rj / p[k];
+  for (int c = 0; c < 3; ++c)
+    cartesianJacobian(2, c) = p[c] / energy;
+  cartesianJacobian(2, 3) = mass / energy;
+  cartesianJacobian(3, 3) = 1;
+
+  // d(px, py, pz, m) / d(rho, theta, phi, m) with px = cos(phi)/rho, py = sin(phi)/rho, pz = 1/(rho tan(theta))
+  const double rho = 1. / mom.perp();
+  const double theta = mom.theta();
+  const double phi = mom.phi();
+  AlgebraicMatrix44 cartesianFromPerigee;
+  for (int c = 0; c < 3; ++c)
+    cartesianFromPerigee(c, 0) = -p[c] / rho;
+  cartesianFromPerigee(2, 1) = -1. / (rho * sin(theta) * sin(theta));
+  cartesianFromPerigee(0, 2) = -p[1];
+  cartesianFromPerigee(1, 2) = p[0];
+  cartesianFromPerigee(3, 3) = 1;
+
+  const AlgebraicMatrix44 momentumJacobian = cartesianJacobian * cartesianFromPerigee;
+  theMomentumJacobian = AlgebraicMatrix64();
+  theMomentumJacobian.Place_at(momentumJacobian, 0, 0);
+
+  // Covariance of the reduced measurement (BaBar Eq. 40): V' = P V P^T, with P the
+  // derivative of the residuals r_i = m_i - h_i, r_j = m_j - h_j with respect to the
+  // cluster position (m_x, m_y, m_z), so that the uncertainty of m_k is included.
+  const TMatrixD& clusterCov = *(part->getPhotonCov());
+  AlgebraicSymMatrix33 positionCov;
+  for (int a = 0; a < 3; ++a) {
+    for (int b = 0; b <= a; ++b)
+      positionCov(a, b) = clusterCov(a, b);
+  }
+  AlgebraicMatrix23 projection;
+  projection(0, i) = 1;
+  projection(0, k) = -ri;
+  projection(1, j) = 1;
+  projection(1, k) = -rj;
+  const AlgebraicSymMatrix22 reducedPositionCov = ROOT::Math::Similarity(projection, positionCov);
+
+  // energy uncertainty matching the energy returned by reco::Photon::energy()
+  const reco::Photon* photon = part->getPhoton();
+  const reco::Photon::P4type p4type = photon->getCandidateP4type() == reco::Photon::undefined
+                                          ? reco::Photon::ecal_photons
+                                          : photon->getCandidateP4type();
+  const double energyError = photon->getCorrectedEnergyError(p4type);
+
+  thePhotonMeasurementError = AlgebraicSymMatrix66();
+  thePhotonMeasurementError.Place_at(reducedPositionCov, 0, 0);
+  thePhotonMeasurementError(2, 2) = energyError * energyError;
+  thePhotonMeasurementError(3, 3) = 1e-5;
+  thePhotonMeasurementError(4, 4) = 1e-5;
+  thePhotonMeasurementError(5, 5) = 1e-5;
+
+  // And finally the residuals:
+  AlgebraicVector3 expansionPoint(v[0], v[1], v[2]);
+  AlgebraicVector4 momentumAtExpansionPoint(rho, theta, phi, mass);
+
+  theConstantTerm = AlgebraicVector6(theExpandedParams - thePositionJacobian * expansionPoint -
+                                     theMomentumJacobian * momentumAtExpansionPoint);
+}
 
 reco::TransientTrack ParticleKinematicLinearizedTrackState::track() const {
   throw VertexException(" ParticleKinematicLinearizedTrackState:: no TransientTrack to return");

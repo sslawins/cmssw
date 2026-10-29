@@ -122,7 +122,8 @@ private:
         part(prt),
         jacobiansAvailable(false),
         theCharge(prt->currentState().particleCharge()),
-        impactPointAvailable(false)
+        impactPointAvailable(false),
+        thePhotonPivot(0)
 
   {}
 
@@ -140,8 +141,16 @@ private:
  */
   void computeNeutralJacobians() const;
 
-  // Method calculating the track parameters and the Jacobians for photons
+  /**
+ * Method calculating the measurement function, the Jacobians and the
+ * measurement covariance for photons (calorimeter cluster position and energy).
+ * The momentum is parametrised as for neutral particles: (1/pt, theta, phi, m).
+ */
   void computePhotonJacobians() const;
+
+  // indices of the cluster coordinates {i, j} measured by the photon model;
+  // the pivot k is the coordinate eliminated with the flight-length parameter
+  void photonMeasuredIndices(int& i, int& j) const;
 
   GlobalPoint theLinPoint;
   RefCountedKinematicParticle part;
@@ -158,5 +167,10 @@ private:
   TrackCharge theCharge;
   //   ImpactPointMeasurementExtractor theIPMExtractor;
   mutable bool impactPointAvailable;
+
+  // photon only: index (0=x, 1=y, 2=z) of the largest momentum component at the
+  // expansion point, and the covariance of the reduced measurement
+  mutable int thePhotonPivot;
+  mutable AlgebraicSymMatrix66 thePhotonMeasurementError;
 };
 #endif

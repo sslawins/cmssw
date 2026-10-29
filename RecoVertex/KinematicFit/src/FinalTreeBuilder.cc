@@ -2,6 +2,7 @@
 #include "RecoVertex/KinematicFitPrimitives/interface/KinematicRefittedTrackState.h"
 #include "RecoVertex/KinematicFitPrimitives/interface/KinematicStatePropagator.h"
 #include "RecoVertex/KinematicFitPrimitives/interface/KinematicState.h"
+#include "RecoVertex/KinematicFitPrimitives/interface/ParticleKinematicLinearizedTrackState.h"
 //#include "Vertex/KinematicFitPrimitives/interface/KinematicLinearizedTrackState.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
@@ -69,8 +70,21 @@ RefCountedKinematicTree FinalTreeBuilder::buildTree(const CachingVertex<6>& vtx,
     }
   }
 
+  float vChi = vtx.totalChiSquared();
+  float vNdf = vtx.degreesOfFreedom();
+
+  // CachingVertex counts 2 degrees of freedom per track. A photon (calorimeter cluster)
+  // has as many measurements as momentum parameters: it does not constrain the vertex
+  // and adds nothing to the chi2, so it must not add degrees of freedom either.
+  for (std::vector<RefCountedVertexTrack>::const_iterator i = refTracks.begin(); i != refTracks.end(); ++i) {
+    const ParticleKinematicLinearizedTrackState* lT =
+        dynamic_cast<const ParticleKinematicLinearizedTrackState*>((*i)->linearizedTrack().get());
+    if (lT != nullptr && lT->particle()->getPhoton() != nullptr)
+      vNdf -= 2. * (*i)->weight();
+  }
+
   //valid decay vertex for our resulting particle
-  RefCountedKinematicVertex dVrt = kvFactory->vertex(vtx);
+  RefCountedKinematicVertex dVrt = kvFactory->vertex(VertexState(vtx.position(), vtx.error()), vChi, vNdf);
 
   //invalid production vertex for our resulting particle
   RefCountedKinematicVertex pVrt = kvFactory->vertex();
@@ -85,8 +99,6 @@ RefCountedKinematicTree FinalTreeBuilder::buildTree(const CachingVertex<6>& vtx,
   KinematicParticle* zp = nullptr;
   RefCountedKinematicParticle pPart = ReferenceCountingPointer<KinematicParticle>(zp);
 
-  float vChi = vtx.totalChiSquared();
-  float vNdf = vtx.degreesOfFreedom();
   RefCountedKinematicParticle nPart = pFactory->particle(nState, vChi, vNdf, pPart);
 
   //adding top particle to the tree
