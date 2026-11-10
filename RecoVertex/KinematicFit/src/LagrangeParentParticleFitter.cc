@@ -90,7 +90,7 @@ RefCountedKinematicTree LagrangeParentParticleFitter::fit(RefCountedKinematicTre
 //new expansionPoint
    exPoint = refPar;
    AlgebraicVector vlp = cs->value(exPoint).first;
-   for(int i = 1; i< vl.num_row();i++)
+   for(int i = 1; i<= vl.num_row();i++)
    {df += std::abs(vlp(i));}
    nstep++; 
   }while(df>theMaxDiff && nstep<theMaxStep);
@@ -228,7 +228,7 @@ std::vector<RefCountedKinematicTree> LagrangeParentParticleFitter::fit(
     //new expansionPoint
     exPoint = refPar;
     AlgebraicVector vlp = cs->value(exPoint).first;
-    for (int i = 1; i < vl.num_row(); i++) {
+    for (int i = 1; i <= vl.num_row(); i++) {   // CLHEP vectors are 1-based: include the last equation
       df += std::abs(vlp(i));
     }
     nstep++;
